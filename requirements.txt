@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pillow
+requests
+pydantic
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
+pymupdf
+nest-asyncio
+openai
+azure-ai-inference
+azure-core
+python-multipart
