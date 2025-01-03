@@ -214,12 +214,12 @@ async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] 
             print(traceback_str)
             raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
         
-    if len(text) == 1:
-        return JSONResponse(content={"text": text[0].markdown_text, "raw_text": text[0].raw_text})
-    else:
+    # if len(text) == 1:
+    #     return JSONResponse(content={"text": text[0].markdown_text, "raw_text": text[0].raw_text})
+    # else:
         # Convert the list of page objects to a list of dictionaries
-        text_dicts = [page_obj.dict() for page_obj in text]
-        return JSONResponse(content={"pages": text_dicts})
+    text_dicts = [page_obj.dict() for page_obj in text]
+    return JSONResponse(content={"pages": text_dicts})
 
 if __name__ == "__main__":
     # Run the application with uvicorn
