@@ -164,7 +164,7 @@ async def classify_image_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"An error occurred while processing the image: {str(e)}")
 
 @app.post("/extract-text/")
-async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] = None, is_url: bool = False):
+async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] = None, is_url: int = 0):
     """
     Endpoint to extract text from an uploaded image or PDF.
 
