@@ -1,6 +1,5 @@
 # Docker
 # Build and push an image to Azure Container Registry
-# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
 
 trigger:
 - main
@@ -9,7 +8,7 @@ resources:
 - repo: self
 
 variables:
-  # Container registry service connection established during pipeline creation
+  # Container registry service connection
   dockerRegistryServiceConnection: 'f553ff6b-dd7d-48a7-853c-609339bcad80'
   imageRepository: 'archivaiaiadevops'
   containerRegistry: 'archivaidb.azurecr.io'
@@ -25,6 +24,13 @@ stages:
     pool:
       name: Default
     steps:
+    - script: |
+        COMMIT_MESSAGE=$(git log -1 --pretty=%s)  # Get the latest commit message
+        SAFE_TAG=$(echo "$COMMIT_MESSAGE" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-_' | cut -c1-50)  # Sanitize the tag
+        echo "Using tag: $SAFE_TAG"
+        echo "##vso[task.setvariable variable=SAFE_TAG]$SAFE_TAG"  # Set the variable in Azure DevOps
+      displayName: "Extract Commit Message and Create Docker Tag"
+
     - task: Docker@2
       displayName: Build and push an image to container registry
       inputs:
@@ -33,5 +39,5 @@ stages:
         dockerfile: $(dockerfilePath)
         containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
-          $(tag)
+          $(SAFE_TAG)
           latest
