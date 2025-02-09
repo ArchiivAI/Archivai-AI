@@ -25,10 +25,13 @@ stages:
       name: Default
     steps:
     - script: |
-        COMMIT_MESSAGE=$(git log -1 --pretty=%s)  # Get the latest commit message
-        SAFE_TAG=$(echo "$COMMIT_MESSAGE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 ]/-/g' | tr -s '-' | cut -c1-50)  # Replace spaces with dashes and remove special characters
+        COMMIT_MESSAGE=$(git log -1 --pretty=%s)
+        # Convert to lowercase and replace any sequence of non-alphanumeric characters with a dash
+        SAFE_TAG=$(echo "$COMMIT_MESSAGE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
+        # Optionally, truncate to a maximum length (50 characters here)
+        SAFE_TAG=${SAFE_TAG:0:50}
         echo "Using tag: $SAFE_TAG"
-        echo "##vso[task.setvariable variable=SAFE_TAG]$SAFE_TAG"  # Set the variable in Azure DevOps
+        echo "##vso[task.setvariable variable=SAFE_TAG]$SAFE_TAG"
       displayName: "Extract Commit Message and Create Docker Tag"
 
     - task: Docker@2
