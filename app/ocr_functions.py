@@ -234,8 +234,7 @@ def extract_text(file, url=False):
                 result = image_ocr(file)
     return result
 
-def vlm_ocr(path, model_deployment, endpoint):
-    image_path = path
+def vlm_ocr(endpoint, model_deployment, system_prompt, user_prompt, url):
     vlm_client = ChatCompletionsClient(
         endpoint=endpoint,
         credential=AzureKeyCredential(key),
@@ -248,8 +247,9 @@ def vlm_ocr(path, model_deployment, endpoint):
             UserMessage(content=[
                 TextContentItem(text=user_prompt),
                 ImageContentItem(
-                    image_url=ImageUrl(
-                        url=image_path,
+                    image_url=ImageUrl.load(
+                        image_file=url,
+                        image_format='jpg',
                         detail=ImageDetailLevel.HIGH,
                     )
                 )
