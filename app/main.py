@@ -128,7 +128,7 @@ def classify_file_bytes(file_bytes: bytes) -> str:
 
 @app.get("/")
 def hello_world():
-    return {"message":"Hello World! Content type error fixed"}
+    return {"message":"Hello World! return an array"}
 
 @app.post("/classify-image/")
 async def classify_image_endpoint(file: UploadFile = File(...)):
@@ -216,7 +216,7 @@ async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] 
         
     # Convert the list of page objects to a list of dictionaries
     text_dicts = [page_obj.dict() for page_obj in text]
-    return JSONResponse(content={"pages": text_dicts})
+    return text_dicts
 
 if __name__ == "__main__":
     # Run the application with uvicorn
