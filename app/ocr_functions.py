@@ -3,7 +3,8 @@ from io import BytesIO
 import base64
 from mimetypes import guess_type
 from openai import AzureOpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Literal
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from azure.storage.blob import BlobServiceClient
@@ -46,11 +47,18 @@ azure_ai_endpoint = keys_client.get_secret("azure-ai-service-endpoint").value
 key = keys_client.get_secret("azure-ai-service-key").value
 
 class Page(BaseModel):
-    markdown_text: str
-    raw_text: str
+    markdown_text: str = Field(..., description="The text extracted from the image in markdown format.")
+    raw_text: str = Field(..., description="The raw text extracted from the image without any formatting.")
+    language: Literal["english", "arabic", "other"] = Field(..., description="The language in which the text is written in the image.")
 
 nest_asyncio.apply()
-system_prompt = "Your are an OCR client using your Vision Capabilities to perform your response and provide a clean and structured text without any notes."
+system_prompt = """
+                You are an OCR client using your Vision Capabilities to perform your response and provide a clean and structured text without any notes.
+                The attributes you need to provide are:
+                - markdown_text: The text extracted from the image in markdown format.
+                - raw_text: The raw text extracted from the image without any formatting.
+                - language: The language in which the text is written in the image. The options are "english" or "arabic" or "others".
+                """
 user_prompt = """extract the text from the image and provide a clean and structured text. 
                 your output format must be in markdown format, with the text extracted from the image. 
                 output will be  in 'markdown' text with markdown rules like titles,headings,etc, nothing else.
@@ -64,7 +72,7 @@ user_prompt = """extract the text from the image and provide a clean and structu
 
                 4) even if the text is not clear, try to extract as much as possible, and don't provide any extra notes.
                 5) output the raw text extracted from the image as well. this text will be used for embedding purposes.
-                6) Extract the text in the language it is written in the image.
+                6) Extract the text in the language it is written in the image. The options are "english" or "arabic".
                 7) I will provide you multiple images, extract the text from all the images and provide the output in the same format.
 
                 """
@@ -95,12 +103,16 @@ def generate_messages(system_prompt, user_prompt, image_urls):
     for url in image_urls]
 
 def task(message):
-    completion = client.beta.chat.completions.parse(
-        model=deployment_name,
-        messages=message,
-        response_format=Page,
-        )
-    return completion.choices[0].message.parsed
+    try:
+        completion = client.beta.chat.completions.parse(
+            model=deployment_name,
+            messages=message,
+            response_format=Page,
+            )
+        page = completion.choices[0].message.parsed
+    except Exception as e:
+        page = Page(markdown_text="", raw_text="")
+    return page
 
 def convert_pdf_to_images(pdf_path, url=False, dpi=300):
     # Open the PDF file
