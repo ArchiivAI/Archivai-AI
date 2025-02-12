@@ -3,7 +3,7 @@ import shutil
 import random
 
 from tqdm import tqdm
-dataest_path = "tobacco-dataset"
+dataest_path = "Tobacco3482-jpg"
 output_path = "tobacco-dataset-split"
 train_ratio = 0.7
 valid_ratio = 0.15
