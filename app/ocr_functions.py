@@ -201,12 +201,13 @@ def extract_text(file, url=False):
         blob_service_client = BlobServiceClient.from_connection_string(keys_client.get_secret("blob-connection-string").value)
         blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
         
-        blob_content = blob_client.get_blob_properties().content_settings.content_type
-        if blob_content == "application/pdf":
+        if file.endswith(".pdf"):
             result = pdf_ocr(blob_client, url=url)
-        elif blob_content.startswith("image/"):
+        elif file.endswith((".png", ".jpg", ".jpeg")):
             result = image_ocr(blob_client, url=url)
-    
+        else:
+            raise ValueError("Unsupported file type")
+
     else:
         if isinstance(file, bytes):
             # Determine the file type from the bytes
@@ -234,8 +235,7 @@ def extract_text(file, url=False):
                 result = image_ocr(file)
     return result
 
-def vlm_ocr(path, model_deployment, endpoint):
-    image_path = path
+def vlm_ocr(endpoint, model_deployment, system_prompt, user_prompt, url):
     vlm_client = ChatCompletionsClient(
         endpoint=endpoint,
         credential=AzureKeyCredential(key),
@@ -248,8 +248,9 @@ def vlm_ocr(path, model_deployment, endpoint):
             UserMessage(content=[
                 TextContentItem(text=user_prompt),
                 ImageContentItem(
-                    image_url=ImageUrl(
-                        url=image_path,
+                    image_url=ImageUrl.load(
+                        image_file=url,
+                        image_format='jpg',
                         detail=ImageDetailLevel.HIGH,
                     )
                 )
