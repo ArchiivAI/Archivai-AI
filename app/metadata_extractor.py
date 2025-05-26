@@ -57,9 +57,9 @@ Example format:
             completion = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=messages,
-                response_model=DynamicModel
+                response_format=DynamicModel
             )
-            return completion.choices[0].message.parsed
+            return completion.choices[0].message.parsed.dict()
         except ValidationError as e:
             print("Validation error:", e)
             raise
