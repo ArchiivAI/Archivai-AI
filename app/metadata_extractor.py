@@ -1,22 +1,25 @@
-from typing import List
+from pydantic import create_model, BaseModel, ValidationError
+from typing import Optional, Dict, List
 from openai import AzureOpenAI
-import json
 
-# ================== Metadata Extractor Class ==================
+class MetadataRequest(BaseModel):
+    content: str
+    features: Dict[str, str]  # example: {"title": "str", "year": "int"}
+
 class MetadataExtractor:
     def __init__(self, client: AzureOpenAI, model: str, system_prompt: str):
         self.client = client
         self.model = model
         self.system_prompt = system_prompt
 
-    def build_messages(self, content: str, features: List[str]) -> List[dict]:
+    def build_messages(self, content: str, features: Dict[str, str]) -> List[dict]:
         user_prompt = f"""
 Here is the document content:
 
 {content}
 
 Please extract the following fields ONLY:
-{', '.join(features)}
+{', '.join(features.keys())}
 
 Instructions:
 - Return the response STRICTLY as a valid JSON object.
@@ -35,17 +38,35 @@ Example format:
             {"role": "user", "content": user_prompt}
         ]
 
-    def extract_metadata(self, content: str, features: List[str]) -> dict:
+    def extract_metadata(self, content: str, features: Dict[str, str]) -> BaseModel:
         messages = self.build_messages(content, features)
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=messages
         )
-        result_raw = completion.choices[0].message.content
+
+        raw_output = completion.choices[0].message.content.strip()
+
+        type_map = {
+            "str": str,
+            "int": int
+        }
+
+        field_definitions = {
+            key: (type_map.get(ftype, str), None)
+            for key, ftype in features.items()
+        }
+
+        DynamicModel = create_model("DynamicMetadataModel", **field_definitions)
+
         try:
-            result = json.loads(result_raw)
-            return result
+            instance = DynamicModel.parse_obj(eval(raw_output))
+            return instance.schema()
+        except ValidationError as e:
+            print("Validation error:", e)
+            print("Raw output was:", raw_output)
+            raise
         except Exception as e:
-            print(f"Error parsing JSON: {e}")
-            print(f"Raw output from model:\n{result_raw}")
-            raise ValueError("The model output is not a valid JSON format.")
+            print("General error:", e)
+            print("Raw output was:", raw_output)
+            raise

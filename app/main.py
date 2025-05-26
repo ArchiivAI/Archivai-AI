@@ -1,5 +1,6 @@
 from app.ocr_functions import extract_text, gpt_ocr_layout
 from app.metadata_extractor import MetadataExtractor
+from app.metadata_extractor import MetadataRequest
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
@@ -80,9 +81,9 @@ Format Example:
 """
 )
 
-class MetadataRequest(BaseModel):
-    content: str
-    features: List[str]
+# class MetadataRequest(BaseModel):
+#     content: str
+#     features: List[str]
 
 
 class classification(BaseModel):
