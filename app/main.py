@@ -128,7 +128,7 @@ def classify_file_bytes(file_bytes: bytes) -> str:
 
 @app.get("/")
 def hello_world():
-    return {"message":"Hello World! add language filed"}
+    return {"message":"Hello World! test azure"}
 
 @app.post("/classify-image/")
 async def classify_image_endpoint(file: UploadFile = File(...)):
