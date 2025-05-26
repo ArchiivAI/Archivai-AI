@@ -1,19 +1,22 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
 # Ignore environment files
 .env
 *.env
 
-# Python cache
-__pycache__/
-*.py[cod]
-
-# VSCode / PyCharm / editors
+# Ignore editor/IDE files
 .vscode/
 .idea/
 
-# OS files
+# Ignore OS-generated files
 .DS_Store
 Thumbs.db
 
-# Docker stuff
+# Ignore log files and other
 *.log
 *.pid
+
+# Ignore Docker files
+*.tar
