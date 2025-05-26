@@ -39,14 +39,6 @@ Example format:
         ]
 
     def extract_metadata(self, content: str, features: Dict[str, str]) -> BaseModel:
-        messages = self.build_messages(content, features)
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages
-        )
-
-        raw_output = completion.choices[0].message.content.strip()
-
         type_map = {
             "str": str,
             "int": int
@@ -59,14 +51,18 @@ Example format:
 
         DynamicModel = create_model("DynamicMetadataModel", **field_definitions)
 
+        messages = self.build_messages(content, features)
+
         try:
-            instance = DynamicModel.parse_obj(eval(raw_output))
-            return instance.schema()
+            completion = self.client.beta.chat.completions.parse(
+                model=self.model,
+                messages=messages,
+                response_model=DynamicModel
+            )
+            return completion.choices[0].message.parsed
         except ValidationError as e:
             print("Validation error:", e)
-            print("Raw output was:", raw_output)
             raise
         except Exception as e:
             print("General error:", e)
-            print("Raw output was:", raw_output)
             raise
