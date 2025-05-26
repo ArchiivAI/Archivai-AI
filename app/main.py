@@ -1,4 +1,6 @@
-from ocr_functions import extract_text, gpt_ocr_layout
+from app.ocr_functions import extract_text, gpt_ocr_layout
+from app.metadata_extractor import MetadataExtractor
+from app.metadata_extractor import MetadataRequest
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
@@ -13,6 +15,7 @@ from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
 from typing import Optional
+from typing import List
 
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
@@ -52,6 +55,36 @@ client = AzureOpenAI(
     api_version=api_version,
     base_url=f"{api_base}/openai/deployments/{deployment_name}"
 )
+
+# Metadata Extractor Setup
+metadata_extractor = MetadataExtractor(
+    client=client,
+    model=deployment_name,
+    system_prompt="""You are a metadata extraction assistant.
+
+Your task is to read the provided document content and extract ONLY the specific fields that will be requested.
+
+Instructions:
+- Extract ONLY the fields listed.
+- Return your entire response STRICTLY as a JSON object.
+- Do NOT include any explanations, comments, or any text before or after the JSON.
+- If a field is missing, leave it with null value.
+- Always return all requested fields even if you have to set some fields as null.
+
+Format Example:
+{
+  "field1": "value1",
+  "field2": "value2",
+  ...
+}
+
+"""
+)
+
+# class MetadataRequest(BaseModel):
+#     content: str
+#     features: List[str]
+
 
 class classification(BaseModel):
     target_class: str
@@ -217,6 +250,14 @@ async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] 
     # Convert the list of page objects to a list of dictionaries
     text_dicts = [page_obj.dict() for page_obj in text]
     return text_dicts
+
+@app.post("/extract_metadata")
+async def extract_metadata_endpoint(request: MetadataRequest):
+    try:
+        result = metadata_extractor.extract_metadata(request.content, request.features)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     # Run the application with uvicorn
