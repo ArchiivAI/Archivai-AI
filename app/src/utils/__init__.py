@@ -4,9 +4,11 @@ __all__ = [
     "checkpoint_path",
     "encoder_path",
     "encoder",
-    "checkpoint"
+    "checkpoint",
+    "Prediction"
 
 ]
 from app.src.utils.config import API_SECRET_KEY 
 from app.src.utils.building_model import train_model
 from app.src.utils.config import checkpoint_path, encoder_path, encoder, checkpoint
+from app.src.utils.inference import Prediction

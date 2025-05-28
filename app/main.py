@@ -1,7 +1,6 @@
 from app.ocr_functions import extract_text
 from app.metadata_extractor import MetadataExtractor
 from app.metadata_extractor import MetadataRequest
-
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -15,30 +14,22 @@ from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
 from typing import Optional
-from typing import List
 from fastapi import FastAPI, HTTPException
 import cohere
-import torch
-import os
-import cohere
-from app.src.utils.classifier import TextClassifier
-from app.src.utils.config import encoder, checkpoint
-from app.ocr_functions import extract_text
+from app.src.utils.inference import Prediction
 
 # FastAPI application instance
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
     description="AI API for ArchivAI",
-    version="1.0.0"
-)
+    version="1.0.0")
 
 # Define allowed origins for CORS
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://ccdtr14p-3000.uks1.devtunnels.ms",
-    "https://syntaxsquad-ai.azurewebsites.net"
-]
+    "https://syntaxsquad-ai.azurewebsites.net"]
 
 # config Cors
 app.add_middleware(
@@ -46,8 +37,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-)
+    allow_headers=["*"],)
 
 # Authenticate to Azure Key Vault
 credential = DefaultAzureCredential()
@@ -64,7 +54,6 @@ co_embed = cohere.Client(
     api_key=cohere_api_key,
     base_url=cohere_endpoint,
 )
-
 # Authenticate to Azure OpenAI
 api_base = keys_client.get_secret("archivai-openai-base").value
 api_key= keys_client.get_secret("archivaigpt4-key").value
@@ -75,7 +64,6 @@ client = AzureOpenAI(
     api_version=api_version,
     base_url=f"{api_base}/openai/deployments/{deployment_name}"
 )
-    
 # Metadata Extractor Setup
 metadata_extractor = MetadataExtractor(
     client=client,
@@ -100,64 +88,76 @@ Format Example:
 
 """
 )
-
 # Define the classification function
-def classify_file_bytes(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str, float, str, str]:
+def classify_file_bytes(file_bytes: bytes) -> str:
     """
     Classify an image to one of the specified categories.
 
     :param file_bytes: Image data in bytes.
-    :return: Tuple of (category_path, confidence, markdown_text, raw_text)
+    :return: Category of the image.
     """
-    # Extract text from the file bytes
-    result = extract_text(file_bytes, url=False)
+    # Open the image from bytes
+    img = Image.open(BytesIO(file_bytes))
 
-    # Combine all pages into one markdown and one raw text block
-    full_raw = "\n".join(page.raw_text for page in result)
+    # Create a buffer to hold the image data
+    buffer = BytesIO()
 
-    # Convert the list of page objects to a list of dictionaries
-    text_dicts = [page_obj.dict() for page_obj in result]
-
-    # get the embeddings
-    text = full_raw    
-    embeddings_response = embedding_client.embed(input_type='classification', texts=[text])
-    embeddings = embeddings_response.embeddings
+    # Save the image to the buffer in its original format
+    img_format = img.format  # Get the image format (e.g., PNG, JPEG)
+    img.save(buffer, format=img_format)
+    # Encode the image data to base64
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    # Create the base64 string with the appropriate data URI scheme
+    img_b64_str = f"data:image/{img_format.lower()};base64,{img_base64}"
+    prompt = """
+        classify this document to one of these categories:
+['Advertisement',
+ 'Email',
+ 'Form',
+ 'Letter',
+ 'Memo',
+ 'News',
+ 'Note',
+ 'Report',
+ 'Resume',
+ 'Scientific']
  
+ And give me the accuracy of your decision from 0 "not sure" to 100 "Sure".
+ if the provided image does not belong to any of the categories, please provide the closest one and because your are not sure, make the accuracy low.
+    """
+    # Pass the image and the prompt to the model
+    response = client.beta.chat.completions.parse(
+        model=deployment_name,
+        messages=[
+            { "role": "system", "content": "You Are a document classification client." },
+            { "role": "user", "content": [  
+                { 
+                    "type": "text", 
+                    "text": prompt
+                },
+                { 
+                    "type": "image_url",
+                    "image_url":
+                    {
+                        "url": img_b64_str
+                    }
+                }
+            ] }
+        ],
+        max_tokens=2000,
+        response_format=classification
+    )
+    result = response.choices[0].message.parsed
+    print(result)
 
-    # creating a pytorch tensor
-    embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
-   
-    # instantiating the model loading the checkpoint
-    model = TextClassifier()
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()  # Set to evaluation mode
-    
-    # Get predictions and confidence scores
-    with torch.no_grad():
-        outputs = model(embeddings_tensor)
-        
-        # Get class predictions
-        _, predicted_classes = torch.max(outputs, 1)
-
-        # Get names of the classes
-        classes = encoder.inverse_transform(predicted_classes.cpu().numpy())
-
-        # Get confidence scores (using softmax)
-        confidences = torch.nn.functional.softmax(outputs, dim=1)
-        confidence_values, _ = torch.max(confidences, 1)
-
-        # Extract single value
-        folder = classes[0] if len(classes) > 0 else "unknown"
-        accuracy = confidence_values[0].item()
-        section = "/SyntaxSquad/"
-
-        return section + folder, accuracy, text_dicts
+    folder = result.target_class
+    accuracy = result.accuracy
+    section = "/SyntaxSquad/"
+    return section + folder, accuracy
 
 class classification(BaseModel):
     target_class: str
     accuracy: float
-
-
 
 @app.get("/")
 def hello_world():
@@ -277,7 +277,7 @@ async def classify_file_endpoint(file: UploadFile = File(...)):
         if len(file_bytes) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
         # Classify the file bytes
-        path, accuracy ,text_dict = classify_file_bytes(file_bytes, embedding_client = co_embed)
+        path, accuracy ,text_dict = Prediction(file_bytes, embedding_client = co_embed)
 
         return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
 
