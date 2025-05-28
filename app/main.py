@@ -88,6 +88,10 @@ Format Example:
 
 """
 )
+
+class classification(BaseModel):
+    target_class: str
+    accuracy: float
 # Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:
     """
@@ -154,10 +158,6 @@ def classify_file_bytes(file_bytes: bytes) -> str:
     accuracy = result.accuracy
     section = "/SyntaxSquad/"
     return section + folder, accuracy
-
-class classification(BaseModel):
-    target_class: str
-    accuracy: float
 
 @app.get("/")
 def hello_world():
