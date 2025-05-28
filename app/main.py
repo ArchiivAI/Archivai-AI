@@ -16,7 +16,7 @@ import traceback
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 import cohere
-from app.src.utils.inference import Prediction
+from app.src.utils.inference import prediction
 
 # FastAPI application instance
 app = FastAPI(
@@ -277,7 +277,7 @@ async def classify_file_endpoint(file: UploadFile = File(...)):
         if len(file_bytes) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
         # Classify the file bytes
-        path, accuracy ,text_dict = Prediction(file_bytes, embedding_client = co_embed)
+        path, accuracy ,text_dict = prediction(file_bytes, embedding_client = co_embed)
 
         return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
 

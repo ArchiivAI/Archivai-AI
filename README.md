@@ -153,7 +153,54 @@ Extracts specified metadata fields from document content using AI.
 - 500: Internal server error
 
 ---
+### 5. `POST /classify-file/`
 
+**Description:**  
+This endpoint classifies an uploaded file (image or PDF) into a predefined document category. It is similar to `/classify-image/`, but supports both images and PDFs. In addition to returning the predicted category (`path`) and model confidence (`accuracy`), it also returns extracted metadata or textual content in a dictionary (`text_dicts`).
+
+The AI model analyzes the file content using embedded representations and document structure to predict the type and extract relevant fields, providing an enriched classification result. It uses Azure-powered AI under the hood for accurate and scalable predictions.
+
+**Supported File Types:**
+- PNG
+- JPEG / JPG
+- PDF
+
+**File Size Limit:**
+- Maximum file size is **5MB**
+
+**Request:**
+- **Method:** `POST`
+- **Content-Type:** `multipart/form-data`
+- **Body Parameters:**
+  - `file`: The file to be classified
+
+**Example using `curl`:**
+```bash
+curl -X POST "http://<host>:8000/classify-file/" \
+  -H "accept: application/json" \
+  -F "file=@example.pdf"
+  ```
+**Successful Response Example:**
+```json
+{
+  "path": "/SyntaxSquad/Letter",
+  "accuracy": 88.7,
+  "text_dicts": {
+    "markdown_text": "**Date:** 2023-04-25\n\n**From:** John Doe\n\n**Subject:** Meeting Confirmation",
+    "raw_text": "Date: 2023-04-25\nFrom: John Doe\nSubject: Meeting Confirmation"
+  }
+}
+```
+**Error Responses:**
+- **400 Bad Request:**
+  - Invalid file type (not PNG, JPEG, JPG, or PDF)
+  - File size exceeds 5MB
+
+- **500 Internal Server Error:**
+  - Unexpected server error
+  - File processing failure (e.g., model error or embedding issue)
+
+----
 ## Notes
 - All endpoints return errors in JSON format with a `detail` field.
 - For classification and extraction endpoints, only PNG, JPEG, JPG, and PDF (where applicable) are supported, with a 5MB size limit.

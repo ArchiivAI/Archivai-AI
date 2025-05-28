@@ -7,7 +7,7 @@ from app.ocr_functions import extract_text
 
 
 
-def Prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str, float, str, str]:
+def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str, float, str, str]:
     """
     Classify an image to one of the specified categories.
 
