@@ -16,16 +16,23 @@ from pydantic import BaseModel
 import traceback
 from typing import Optional
 from typing import List
-from app.src.utils.inference import classify_file_bytes
 from fastapi import FastAPI, HTTPException
 import cohere
+import torch
+import os
+import cohere
+from app.src.utils.classifier import TextClassifier
+from app.src.utils.config import encoder, checkpoint
+from app.ocr_functions import extract_text
 
+# FastAPI application instance
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
     description="AI API for ArchivAI",
     version="1.0.0"
 )
 
+# Define allowed origins for CORS
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -94,41 +101,100 @@ Format Example:
 """
 )
 
+# Define the classification function
+def classify_file_bytes(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str, float, str, str]:
+    """
+    Classify an image to one of the specified categories.
+
+    :param file_bytes: Image data in bytes.
+    :return: Tuple of (category_path, confidence, markdown_text, raw_text)
+    """
+    # Extract text from the file bytes
+    result = extract_text(file_bytes, url=False)
+
+    # Combine all pages into one markdown and one raw text block
+    full_raw = "\n".join(page.raw_text for page in result)
+
+    # Convert the list of page objects to a list of dictionaries
+    text_dicts = [page_obj.dict() for page_obj in result]
+
+    # get the embeddings
+    text = full_raw    
+    embeddings_response = embedding_client.embed(input_type='classification', texts=[text])
+    embeddings = embeddings_response.embeddings
+ 
+
+    # creating a pytorch tensor
+    embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
+   
+    # instantiating the model loading the checkpoint
+    model = TextClassifier()
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()  # Set to evaluation mode
+    
+    # Get predictions and confidence scores
+    with torch.no_grad():
+        outputs = model(embeddings_tensor)
+        
+        # Get class predictions
+        _, predicted_classes = torch.max(outputs, 1)
+
+        # Get names of the classes
+        classes = encoder.inverse_transform(predicted_classes.cpu().numpy())
+
+        # Get confidence scores (using softmax)
+        confidences = torch.nn.functional.softmax(outputs, dim=1)
+        confidence_values, _ = torch.max(confidences, 1)
+
+        # Extract single value
+        folder = classes[0] if len(classes) > 0 else "unknown"
+        accuracy = confidence_values[0].item()
+        section = "/SyntaxSquad/"
+
+        return section + folder, accuracy, text_dicts
+
 class classification(BaseModel):
     target_class: str
     accuracy: float
+
 
 
 @app.get("/")
 def hello_world():
     return {"message":"Hello World! test metadata extraction"}
 
-@app.post("/classify-file/")
-async def classify_file_endpoint(file: UploadFile = File(...)):
+@app.post("/classify-image/")
+async def classify_image_endpoint(file: UploadFile = File(...)):
     """
-    Endpoint to classify an uploaded File.
+    Endpoint to classify an uploaded image.
 
-    :param file: file uploaded by the user.
+    :param file: Image file uploaded by the user.
     :return: JSON response with the classification result.
     """
     try:
         # Validate the uploaded file's content type
-        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
-            raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
-        # Read the file bytes
-        file_bytes = await file.read()
-        # Check the size of the file (limit to 5MB)
-        if len(file_bytes) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
-        # Classify the file bytes
-        path, accuracy ,text_dict = classify_file_bytes(file_bytes, embedding_client = co_embed)
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
+            raise HTTPException(status_code=400, detail="Invalid image type. Only PNG and JPEG are supported.")
 
-        return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
+        # Read the image bytes
+        file_bytes = await file.read()
+
+        # Check the size of the image (limit to 5MB)
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
+
+        # Classify the image
+        path, accuracy = classify_file_bytes(file_bytes)
+
+        return JSONResponse(content={"path": path, "accuracy": accuracy})
 
     except ValueError as ve:
         raise HTTPException(status_code=500, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
+        # traceback_str = ''.join(traceback.format_exception(e))
+        # print(traceback_str)
+        # Log the exception details if necessary
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the image: {str(e)}")
 
 @app.post("/extract-text/")
 async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] = None, is_url: int = 0):
@@ -192,6 +258,34 @@ async def extract_metadata_endpoint(request: MetadataRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/classify-file/")
+async def classify_file_endpoint(file: UploadFile = File(...)):
+    """
+    Endpoint to classify an uploaded File.
+
+    :param file: file uploaded by the user.
+    :return: JSON response with the classification result.
+    """
+    try:
+        # Validate the uploaded file's content type
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
+        # Read the file bytes
+        file_bytes = await file.read()
+        # Check the size of the file (limit to 5MB)
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+        # Classify the file bytes
+        path, accuracy ,text_dict = classify_file_bytes(file_bytes, embedding_client = co_embed)
+
+        return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
+
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
+
 
 if __name__ == "__main__":
     # Run the application with uvicorn
