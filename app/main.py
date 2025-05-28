@@ -1,4 +1,4 @@
-from app.ocr_functions import extract_text, gpt_ocr_layout
+from app.ocr_functions import extract_text
 from app.metadata_extractor import MetadataExtractor
 from app.metadata_extractor import MetadataRequest
 
@@ -16,6 +16,9 @@ from pydantic import BaseModel
 import traceback
 from typing import Optional
 from typing import List
+from app.src.utils.inference import classify_file_bytes
+from fastapi import FastAPI, HTTPException
+import cohere
 
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
@@ -45,6 +48,16 @@ keyvault_name = "vaultarchivai"
 kv_uri = f"https://{keyvault_name}.vault.azure.net"
 keys_client = SecretClient(vault_url=kv_uri, credential=credential)
 
+# get Cohere credentials from Azure Key Vault
+cohere_api_key = keys_client.get_secret("CO-API-KEY").value
+cohere_endpoint = keys_client.get_secret("AZURE-ML-COHERE-EMBED-ENDPOINT").value
+
+# making embeddings client 
+co_embed = cohere.Client(
+    api_key=cohere_api_key,
+    base_url=cohere_endpoint,
+)
+
 # Authenticate to Azure OpenAI
 api_base = keys_client.get_secret("archivai-openai-base").value
 api_key= keys_client.get_secret("archivaigpt4-key").value
@@ -55,7 +68,7 @@ client = AzureOpenAI(
     api_version=api_version,
     base_url=f"{api_base}/openai/deployments/{deployment_name}"
 )
-
+    
 # Metadata Extractor Setup
 metadata_extractor = MetadataExtractor(
     client=client,
@@ -81,120 +94,41 @@ Format Example:
 """
 )
 
-# class MetadataRequest(BaseModel):
-#     content: str
-#     features: List[str]
-
-
 class classification(BaseModel):
     target_class: str
     accuracy: float
 
-def classify_file_bytes(file_bytes: bytes) -> str:
-    """
-    Classify an image to one of the specified categories.
-
-    :param file_bytes: Image data in bytes.
-    :return: Category of the image.
-    """
-
-    # Open the image from bytes
-    img = Image.open(BytesIO(file_bytes))
-    
-    # Create a buffer to hold the image data
-    buffer = BytesIO()
-    
-    # Save the image to the buffer in its original format
-    img_format = img.format  # Get the image format (e.g., PNG, JPEG)
-    img.save(buffer, format=img_format)
-    
-    # Encode the image data to base64
-    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
-    # Create the base64 string with the appropriate data URI scheme
-    img_b64_str = f"data:image/{img_format.lower()};base64,{img_base64}"
-    prompt = """
-        classify this document to one of these categories:
-['Advertisement',
- 'Email',
- 'Form',
- 'Letter',
- 'Memo',
- 'News',
- 'Note',
- 'Report',
- 'Resume',
- 'Scientific']
- 
- And give me the accuracy of your decision from 0 "not sure" to 100 "Sure".
- if the provided image does not belong to any of the categories, please provide the closest one and because your are not sure, make the accuracy low.
-    """
-    # Pass the image and the prompt to the model
-    response = client.beta.chat.completions.parse(
-        model=deployment_name,
-        messages=[
-            { "role": "system", "content": "You Are a document classification client." },
-            { "role": "user", "content": [  
-                { 
-                    "type": "text", 
-                    "text": prompt
-                },
-                { 
-                    "type": "image_url",
-                    "image_url":
-                    {
-                        "url": img_b64_str
-                    }
-                }
-            ] }
-        ],
-        max_tokens=2000,
-        response_format=classification
-    )
-    result = response.choices[0].message.parsed
-    print(result)
-
-    folder = result.target_class
-    accuracy = result.accuracy
-    section = "/SyntaxSquad/"
-    return section + folder, accuracy
 
 @app.get("/")
 def hello_world():
     return {"message":"Hello World! test metadata extraction"}
 
-@app.post("/classify-image/")
-async def classify_image_endpoint(file: UploadFile = File(...)):
+@app.post("/classify-file/")
+async def classify_file_endpoint(file: UploadFile = File(...)):
     """
-    Endpoint to classify an uploaded image.
+    Endpoint to classify an uploaded File.
 
-    :param file: Image file uploaded by the user.
+    :param file: file uploaded by the user.
     :return: JSON response with the classification result.
     """
     try:
         # Validate the uploaded file's content type
-        if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-            raise HTTPException(status_code=400, detail="Invalid image type. Only PNG and JPEG are supported.")
-
-        # Read the image bytes
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
+        # Read the file bytes
         file_bytes = await file.read()
-
-        # Check the size of the image (limit to 5MB)
+        # Check the size of the file (limit to 5MB)
         if len(file_bytes) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+        # Classify the file bytes
+        path, accuracy ,text_dict = classify_file_bytes(file_bytes, embedding_client = co_embed)
 
-        # Classify the image
-        path, accuracy = classify_file_bytes(file_bytes)
-
-        return JSONResponse(content={"path": path, "accuracy": accuracy})
+        return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
 
     except ValueError as ve:
         raise HTTPException(status_code=500, detail=str(ve))
     except Exception as e:
-        # traceback_str = ''.join(traceback.format_exception(e))
-        # print(traceback_str)
-        # Log the exception details if necessary
-        raise HTTPException(status_code=500, detail=f"An error occurred while processing the image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
 
 @app.post("/extract-text/")
 async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] = None, is_url: int = 0):
