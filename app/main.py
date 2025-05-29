@@ -1,7 +1,6 @@
-from app.ocr_functions import extract_text, gpt_ocr_layout
+from app.ocr_functions import extract_text
 from app.metadata_extractor import MetadataExtractor
 from app.metadata_extractor import MetadataRequest
-
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -15,20 +14,22 @@ from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
 from typing import Optional
-from typing import List
+from fastapi import FastAPI, HTTPException
+import cohere
+from app.src.utils.inference import prediction
 
+# FastAPI application instance
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
     description="AI API for ArchivAI",
-    version="1.0.0"
-)
+    version="1.0.0")
 
+# Define allowed origins for CORS
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://ccdtr14p-3000.uks1.devtunnels.ms",
-    "https://syntaxsquad-ai.azurewebsites.net"
-]
+    "https://syntaxsquad-ai.azurewebsites.net"]
 
 # config Cors
 app.add_middleware(
@@ -36,8 +37,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
-)
+    allow_headers=["*"],)
 
 # Authenticate to Azure Key Vault
 credential = DefaultAzureCredential()
@@ -45,6 +45,15 @@ keyvault_name = "vaultarchivai"
 kv_uri = f"https://{keyvault_name}.vault.azure.net"
 keys_client = SecretClient(vault_url=kv_uri, credential=credential)
 
+# get Cohere credentials from Azure Key Vault
+cohere_api_key = keys_client.get_secret("CO-API-KEY").value
+cohere_endpoint = keys_client.get_secret("AZURE-ML-COHERE-EMBED-ENDPOINT").value
+
+# making embeddings client 
+co_embed = cohere.Client(
+    api_key=cohere_api_key,
+    base_url=cohere_endpoint,
+)
 # Authenticate to Azure OpenAI
 api_base = keys_client.get_secret("archivai-openai-base").value
 api_key= keys_client.get_secret("archivaigpt4-key").value
@@ -55,7 +64,6 @@ client = AzureOpenAI(
     api_version=api_version,
     base_url=f"{api_base}/openai/deployments/{deployment_name}"
 )
-
 # Metadata Extractor Setup
 metadata_extractor = MetadataExtractor(
     client=client,
@@ -81,15 +89,10 @@ Format Example:
 """
 )
 
-# class MetadataRequest(BaseModel):
-#     content: str
-#     features: List[str]
-
-
 class classification(BaseModel):
     target_class: str
     accuracy: float
-
+# Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:
     """
     Classify an image to one of the specified categories.
@@ -97,20 +100,17 @@ def classify_file_bytes(file_bytes: bytes) -> str:
     :param file_bytes: Image data in bytes.
     :return: Category of the image.
     """
-
     # Open the image from bytes
     img = Image.open(BytesIO(file_bytes))
-    
+
     # Create a buffer to hold the image data
     buffer = BytesIO()
-    
+
     # Save the image to the buffer in its original format
     img_format = img.format  # Get the image format (e.g., PNG, JPEG)
     img.save(buffer, format=img_format)
-    
     # Encode the image data to base64
     img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
     # Create the base64 string with the appropriate data URI scheme
     img_b64_str = f"data:image/{img_format.lower()};base64,{img_base64}"
     prompt = """
@@ -258,6 +258,34 @@ async def extract_metadata_endpoint(request: MetadataRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/classify-file/")
+async def classify_file_endpoint(file: UploadFile = File(...)):
+    """
+    Endpoint to classify an uploaded File.
+
+    :param file: file uploaded by the user.
+    :return: JSON response with the classification result.
+    """
+    try:
+        # Validate the uploaded file's content type
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
+        # Read the file bytes
+        file_bytes = await file.read()
+        # Check the size of the file (limit to 5MB)
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+        # Classify the file bytes
+        path, accuracy ,text_dict = prediction(file_bytes, embedding_client = co_embed)
+
+        return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
+
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
+
 
 if __name__ == "__main__":
     # Run the application with uvicorn
