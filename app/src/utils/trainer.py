@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from typing import Tuple
 from app.src.utils.config import checkpoint_path
+import time
 
 class Trainer:
     def __init__(self, model, criterion, optimizer, scheduler, device,
@@ -62,6 +63,9 @@ class Trainer:
         patience_counter = 0
         best_val_loss = float('inf')
         
+        # counting time
+        start_time = time.time()
+
         for epoch in range(num_epochs):
             train_loss, train_acc = self.train_epoch(train_loader)
             val_loss, val_acc = self.validate(val_loader)
@@ -71,8 +75,10 @@ class Trainer:
             print(f"Epoch [{epoch+1}/{num_epochs}]")
             print(f"Training - Loss: {train_loss:.4f}, Accuracy: {train_acc:.2f}%")
             print(f"Validation - Loss: {val_loss:.4f}, Accuracy: {val_acc:.2f}%")
-            
-          
+
+            if epoch == 0:
+                yield "Training started...\n\n\n"
+
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
@@ -91,3 +97,6 @@ class Trainer:
                 }, checkpoint_path)
                 print("Early stopping triggered!")
                 break
+        # returning the time taken for training
+        end_time = time.time()
+        yield f"Training completed in {end_time - start_time:.2f} seconds.\n\n\n"   

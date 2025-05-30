@@ -201,6 +201,54 @@ curl -X POST "http://<host>:8000/classify-file/" \
   - File processing failure (e.g., model error or embedding issue)
 
 ----
+### 6. `POST /Train-Model/`
+
+**Description:**  
+Triggers the training process for the document classification model. This endpoint reads labeled documents from the database, preprocesses them, optionally filters by specified folder IDs, encodes labels, trains a neural network classifier, and saves both the trained model and label encoder.
+
+Progress is streamed live to the client during the training process.
+
+**Request:**
+- **Method:** `POST`
+- **Content-Type:** `application/json`
+- **Body Parameters (optional):**
+  - `folder_ids`: (list of integers) A list of folder IDs to restrict training to specific labeled folders. If not provided, the model trains on all available labeled data.
+
+**Example using `curl`:**
+```bash
+curl -X POST "http://<host>:8000/Train-Model/" \
+  -H "accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -d '{"folder_ids": [101, 102, 103]}'
+```
+
+**Streaming Response Example:**
+```
+Training started...
+
+
+Training completed in 12.34 seconds.
+```
+
+**Error Streaming Example:**
+```
+Training started...
+
+
+An error occurred during training: Database connection failed.
+```
+
+**Response Type:**  
+- `text/event-stream` — The response is streamed progressively as plain text chunks.
+
+**Error Responses:**
+- **400 Bad Request:**
+  - No data found for training
+  - Invalid folder ID list
+- **500 Internal Server Error:**
+  - Unexpected failure during preprocessing, training, or saving
+
+---
 ## Notes
 - All endpoints return errors in JSON format with a `detail` field.
 - For classification and extraction endpoints, only PNG, JPEG, JPG, and PDF (where applicable) are supported, with a 5MB size limit.

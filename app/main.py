@@ -17,13 +17,14 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 import cohere
 from app.src.utils.inference import prediction
+from app.src.utils.building_model import train_model
+from fastapi.responses import StreamingResponse
 
 # FastAPI application instance
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
     description="AI API for ArchivAI",
     version="1.0.0")
-
 # Define allowed origins for CORS
 origins = [
     "http://localhost:3000",
@@ -105,7 +106,6 @@ def classify_file_bytes(file_bytes: bytes) -> str:
 
     # Create a buffer to hold the image data
     buffer = BytesIO()
-
     # Save the image to the buffer in its original format
     img_format = img.format  # Get the image format (e.g., PNG, JPEG)
     img.save(buffer, format=img_format)
@@ -286,7 +286,22 @@ async def classify_file_endpoint(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
 
+@app.post("/Train-Model")
+async def train_model_endpoint(folder_ids: Optional[list[int]] = None):
+    """
+    Endpoint to train the model.
 
+    """
+    def massage_generator():
+        try:
+            # Train the model using the Cohere client
+            for message in train_model(co_embed, folder_ids):
+                yield message
+        except Exception as e:
+            yield f"An error occurred during training: {str(e)}"
+    # Return a streaming response
+    return StreamingResponse(massage_generator(), media_type="text/plain")
+    
 if __name__ == "__main__":
     # Run the application with uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
