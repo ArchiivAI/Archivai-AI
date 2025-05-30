@@ -10,11 +10,25 @@ from app.src.utils.config import encoder_path
 import numpy as np
 import psycopg2
 import pandas as pd
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 
 def train_model(chere_client: cohere.Client, folder_ids: list = None):
-    
+        
+    # Authenticate to Azure Key Vault
+    credential = DefaultAzureCredential()
+    keyvault_name = "vaultarchivai"
+    kv_uri = f"https://{keyvault_name}.vault.azure.net"
+    keys_client = SecretClient(vault_url=kv_uri, credential=credential)
+
+    # Fetch secrets
+    db_user = keys_client.get_secret("DB-USER").value
+    db_password = keys_client.get_secret("DB-PASSWORD").value
+    db_host = keys_client.get_secret("DB-HOST").value
+    db_name = keys_client.get_secret("DB-NAME").value
+
     # Connect to the PostgreSQL database
-    cnx = psycopg2.connect(user="archivai", password="Saad@2356925", host="archivai-database.postgres.database.azure.com", port=5432, database="postgres")
+    cnx = psycopg2.connect(user= db_user, password=db_password, host=db_host, port=5432, database=db_name)
     print("Connected successfully!")
     cur = cnx.cursor()
     # Construct the query

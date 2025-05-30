@@ -13,12 +13,13 @@ from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 import cohere
 from app.src.utils.inference import prediction
 from app.src.utils.building_model import train_model
 from fastapi.responses import StreamingResponse
+from fastapi import Body
 
 # FastAPI application instance
 app = FastAPI(
@@ -31,7 +32,6 @@ origins = [
     "http://127.0.0.1:3000",
     "https://ccdtr14p-3000.uks1.devtunnels.ms",
     "https://syntaxsquad-ai.azurewebsites.net"]
-
 # config Cors
 app.add_middleware(
     CORSMiddleware,
@@ -45,16 +45,13 @@ credential = DefaultAzureCredential()
 keyvault_name = "vaultarchivai"
 kv_uri = f"https://{keyvault_name}.vault.azure.net"
 keys_client = SecretClient(vault_url=kv_uri, credential=credential)
-
 # get Cohere credentials from Azure Key Vault
 cohere_api_key = keys_client.get_secret("CO-API-KEY").value
 cohere_endpoint = keys_client.get_secret("AZURE-ML-COHERE-EMBED-ENDPOINT").value
-
 # making embeddings client 
 co_embed = cohere.Client(
     api_key=cohere_api_key,
-    base_url=cohere_endpoint,
-)
+    base_url=cohere_endpoint,)
 # Authenticate to Azure OpenAI
 api_base = keys_client.get_secret("archivai-openai-base").value
 api_key= keys_client.get_secret("archivaigpt4-key").value
@@ -93,6 +90,10 @@ Format Example:
 class classification(BaseModel):
     target_class: str
     accuracy: float
+
+class TrainModelRequest(BaseModel):
+    folder_ids: Optional[List[int]] = None
+
 # Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:
     """
@@ -103,7 +104,6 @@ def classify_file_bytes(file_bytes: bytes) -> str:
     """
     # Open the image from bytes
     img = Image.open(BytesIO(file_bytes))
-
     # Create a buffer to hold the image data
     buffer = BytesIO()
     # Save the image to the buffer in its original format
@@ -293,9 +293,16 @@ async def train_model_endpoint(folder_ids: Optional[list[int]] = None):
 
     """
     def massage_generator():
+        
         try:
+            # Check if folder_ids is None or a placeholder [0]
+            if folder_ids is None or folder_ids == [0]:
+                folder_ids_to_use = None
+            else:
+                folder_ids_to_use = folder_ids
+
             # Train the model using the Cohere client
-            for message in train_model(co_embed, folder_ids):
+            for message in train_model(co_embed, folder_ids_to_use):
                 yield message
         except Exception as e:
             yield f"An error occurred during training: {str(e)}"
