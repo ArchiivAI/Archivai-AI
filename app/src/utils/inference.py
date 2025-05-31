@@ -7,7 +7,7 @@ from app.ocr_functions import extract_text
 
 
 
-def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str, float, str, str]:
+def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int, float, str, str]:
     """
     Classify an image to one of the specified categories.
 
@@ -54,6 +54,5 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[str,
         # Extract single value
         folder = classes[0] if len(classes) > 0 else "unknown"
         accuracy = confidence_values[0].item()
-        section = "/SyntaxSquad/"
 
-        return section + folder, accuracy, text_dicts
+        return int(folder), accuracy, text_dicts

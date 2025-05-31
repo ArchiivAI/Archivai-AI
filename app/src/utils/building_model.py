@@ -1,5 +1,4 @@
 import cohere
-import os
 import torch
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -7,21 +6,64 @@ import joblib
 from torch.utils.data import DataLoader, TensorDataset
 from app.src.utils.classifier import TextClassifier
 from app.src.utils.trainer import Trainer
-from typing import List
 from app.src.utils.config import encoder_path
-from typing import List
+import numpy as np
+import psycopg2
+import pandas as pd
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 
-def train_model(raw_text: List[str], labels : List[str]):
+def train_model(chere_client: cohere.Client, folder_ids: list = None):
+        
+    # Authenticate to Azure Key Vault
+    credential = DefaultAzureCredential()
+    keyvault_name = "vaultarchivai"
+    kv_uri = f"https://{keyvault_name}.vault.azure.net"
+    keys_client = SecretClient(vault_url=kv_uri, credential=credential)
 
-    # making embeddings client 
-    co_embed = cohere.Client(
-    api_key=os.getenv("AZURE_ML_COHERE_EMBED_CREDENTIAL"),
-    base_url=os.getenv("AZURE_ML_COHERE_EMBED_ENDPOINT"),
-     )
-    
+    # Fetch secrets
+    db_user = keys_client.get_secret("DB-USER").value
+    db_password = keys_client.get_secret("DB-PASSWORD").value
+    db_host = keys_client.get_secret("DB-HOST").value
+    db_name = keys_client.get_secret("DB-NAME").value
+
+    # Connect to the PostgreSQL database
+    cnx = psycopg2.connect(user= db_user, password=db_password, host=db_host, port=5432, database=db_name)
+    print("Connected successfully!")
+    cur = cnx.cursor()
+    # Construct the query
+    query = """
+    SELECT p."FileId", p."RawText", f."FolderId"
+    FROM public."Page" p
+    JOIN public."Files" f ON p."FileId" = f."Id"
+    """
+    if folder_ids:
+        placeholders = ','.join(['%s'] * len(folder_ids))
+        query += f' WHERE f."FolderId" IN ({placeholders})'
+        cur.execute(query, tuple(folder_ids))
+    else:
+        cur.execute(query)
+
+    rows = cur.fetchall()
+    colnames = [desc[0] for desc in cur.description]
+    df = pd.DataFrame(rows, columns=colnames)
+
+    if df.empty:
+        print("No data found for the specified FolderIds.")
+        return
+
+    # Group by FileId to get the full content of each file
+    files_content = []
+    labels = []
+    for file_id, group in df.groupby('FileId'):
+        content = '\n'.join(group['RawText'].astype(str))
+        folder_id = (group['FolderId'].iloc[0])
+        files_content.append(content)
+        labels.append(folder_id)
+
     # get the embeddings
-    raw_text = raw_text
-    embeddings = co_embed.embed(input_type= 'classification', texts= raw_text).embeddings
+    raw_text = files_content
+    embeddings = chere_client.embed(input_type= 'classification', texts= raw_text).embeddings
 
     # encoding the target variable 
     encoder = LabelEncoder()
@@ -32,7 +74,7 @@ def train_model(raw_text: List[str], labels : List[str]):
 
     # converting to torch tensor
     embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
-    labels_tensor = torch.tensor(labels_encoded, torch.int)
+    labels_tensor = torch.tensor(labels_encoded)
 
     # splitting the data to train and test
     embeddings_train, embeddings_test, classes_train, classes_test = train_test_split(
@@ -48,15 +90,15 @@ def train_model(raw_text: List[str], labels : List[str]):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         
     # inistantiating a model
-    model = TextClassifier(num_classes = len(labels))
+    model = TextClassifier(num_classes = len(encoder.classes_))
 
     # choosing device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     # calculating counts
-    class_counts = labels.value_counts().sort_index()
-    weights = 1.0 / torch.tensor(class_counts.values, dtype=torch.float32)
+    class_counts = np.bincount(labels_encoded)
+    weights = 1.0 / torch.tensor(class_counts, dtype=torch.float32)
     weights = weights / weights.sum()
 
     # setting the criterion, optimizer and schedular
@@ -66,7 +108,10 @@ def train_model(raw_text: List[str], labels : List[str]):
 
     # training and validating the model
     trainer_inist = Trainer(model, criterion, optimizer, scheduler, device)
-    trainer_inist.train(train_loader, test_loader, num_epochs=30, patience= 5)
+
+    # Train the model
+    for message in trainer_inist.train(train_loader, test_loader, num_epochs=30, patience= 5):
+       yield message
 
             
             
