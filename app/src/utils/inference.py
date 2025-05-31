@@ -34,6 +34,7 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int,
    
     # Load the model from the checkpoint
     model = TextClassifier(num_classes= len(encoder.classes_))
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()  # Set to evaluation mode
     
     # Get predictions and confidence scores

@@ -156,7 +156,7 @@ Extracts specified metadata fields from document content using AI.
 ### 5. `POST /classify-file/`
 
 **Description:**  
-This endpoint classifies an uploaded file (image or PDF) into a predefined document category. It is similar to `/classify-image/`, but supports both images and PDFs. In addition to returning the predicted category (`path`) and model confidence (`accuracy`), it also returns extracted metadata or textual content in a dictionary (`text_dicts`).
+This endpoint classifies an uploaded file (image or PDF) into a its folder ID. It is similar to `/classify-image/`, but supports both images and PDFs. In addition to returning the predicted folder ID (`path`) and model confidence (`accuracy`), it also returns extracted metadata or textual content in a dictionary (`text_dicts`).
 
 The AI model analyzes the file content using embedded representations and document structure to predict the type and extract relevant fields, providing an enriched classification result. It uses Azure-powered AI under the hood for accurate and scalable predictions.
 
@@ -183,7 +183,7 @@ curl -X POST "http://<host>:8000/classify-file/" \
 **Successful Response Example:**
 ```json
 {
-  "path": "/SyntaxSquad/Letter",
+  "path": 501,
   "accuracy": 88.7,
   "text_dicts": {
     "markdown_text": "**Date:** 2023-04-25\n\n**From:** John Doe\n\n**Subject:** Meeting Confirmation",
