@@ -32,9 +32,8 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int,
     # creating a pytorch tensor
     embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
    
-    # instantiating the model loading the checkpoint
-    model = TextClassifier()
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # Load the model from the checkpoint
+    model = TextClassifier(num_classes= len(encoder.classes_))
     model.eval()  # Set to evaluation mode
     
     # Get predictions and confidence scores
