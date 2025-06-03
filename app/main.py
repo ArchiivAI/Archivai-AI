@@ -101,6 +101,7 @@ class TrainModelRequest(BaseModel):
 class StoreDataRequest(BaseModel):
     document_text: str
     file_id: int
+    image_url: Optional[str] = None
 
 class RetrieveRequest(BaseModel):
     question: str
@@ -331,7 +332,7 @@ async def store_document_endpoint(request: StoreDataRequest):
     Endpoint to store document text in the vector database for semantic search.
     
     Args:
-        request: StoreDataRequest containing document_text and file_id
+        request: StoreDataRequest containing document_text, file_id, and optional image_url
         
     Returns:
         JSON response with storage status
