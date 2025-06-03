@@ -51,7 +51,6 @@ class Page(BaseModel):
     raw_text: str = Field(..., description="The raw text extracted from the image without any formatting.")
     language: Literal["english", "arabic", "other"] = Field(..., description="The language in which the text is written in the image.")
 
-nest_asyncio.apply()
 system_prompt = """
                 You are an OCR client using your Vision Capabilities to perform your response and provide a clean and structured text without any notes.
                 The attributes you need to provide are:
