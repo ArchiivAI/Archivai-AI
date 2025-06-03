@@ -1,6 +1,7 @@
 from app.ocr_functions import extract_text
 from app.metadata_extractor import MetadataExtractor
 from app.metadata_extractor import MetadataRequest
+from app.rag_service import RAGService
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -14,7 +15,6 @@ from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException
 import cohere
 from app.src.utils.inference import prediction
 from app.src.utils.building_model import train_model
@@ -87,12 +87,27 @@ Format Example:
 """
 )
 
+# RAG Service Setup
+rag_service = RAGService(keys_client=keys_client)
+
 class classification(BaseModel):
     target_class: str
     accuracy: float
 
 class TrainModelRequest(BaseModel):
     folder_ids: Optional[List[int]] = None
+
+# Pydantic models for RAG endpoints
+class StoreDataRequest(BaseModel):
+    document_text: str
+    file_id: int
+
+class RetrieveRequest(BaseModel):
+    question: str
+    k: Optional[int] = 10
+
+class ClearDataRequest(BaseModel):
+    file_id: Optional[int] = None  # If None, clear all documents
 
 # Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:
@@ -305,9 +320,81 @@ async def train_model_endpoint(folder_ids: Optional[list[int]] = None):
             for message in train_model(co_embed, folder_ids_to_use):
                 yield message
         except Exception as e:
-            yield f"An error occurred during training: {str(e)}"
-    # Return a streaming response
+            yield f"An error occurred during training: {str(e)}"    # Return a streaming response
     return StreamingResponse(massage_generator(), media_type="text/plain")
+
+# ========== RAG ENDPOINTS ==========
+
+@app.post("/rag/store")
+async def store_document_endpoint(request: StoreDataRequest):
+    """
+    Endpoint to store document text in the vector database for semantic search.
+    
+    Args:
+        request: StoreDataRequest containing document_text and file_id
+        
+    Returns:
+        JSON response with storage status
+    """
+    try:
+        result = rag_service.store_data(request.document_text, request.file_id)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while storing the document: {str(e)}")
+
+@app.post("/rag/retrieve")
+async def retrieve_documents_endpoint(request: RetrieveRequest):
+    """
+    Endpoint to retrieve relevant documents and get LLM response based on a question.
+    
+    Args:
+        request: RetrieveRequest containing question and optional k parameter
+        
+    Returns:
+        JSON response with retrieved file IDs and LLM response
+    """
+    try:
+        file_ids, llm_response = rag_service.retrieve(request.question, request.k)
+        return JSONResponse(content={
+            "file_ids": file_ids,
+            "response": llm_response,
+            "total_retrieved": len(file_ids)
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred during retrieval: {str(e)}")
+
+@app.post("/rag/clear")
+async def clear_documents_endpoint(request: ClearDataRequest):
+    """
+    Endpoint to clear documents from the vector database.
+    
+    Args:
+        request: ClearDataRequest containing optional file_id
+                - If file_id is provided, only documents with that ID will be deleted
+                - If file_id is None, all documents will be cleared
+        
+    Returns:
+        JSON response with deletion status and count
+    """
+    try:
+        result = rag_service.clear_data(request.file_id)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while clearing documents: {str(e)}")
+
+@app.get("/rag/stats")
+async def get_rag_stats():
+    """
+    Endpoint to get statistics about the RAG vector database.
+    
+    Returns:
+        JSON response with collection statistics
+    """
+    try:
+        stats = rag_service.get_collection_stats()
+        return JSONResponse(content=stats)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while getting stats: {str(e)}")
     
 if __name__ == "__main__":
     # Run the application with uvicorn
