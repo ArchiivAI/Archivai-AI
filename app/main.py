@@ -14,18 +14,18 @@ from azure.keyvault.secrets import SecretClient
 from pydantic import BaseModel
 import traceback
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException
 import cohere
 from app.src.utils.inference import prediction
 from app.src.utils.building_model import train_model
 from fastapi.responses import StreamingResponse
-from fastapi import Body
+from app.src.utils.model_manager import ModelManager
 
 # FastAPI application instance
 app = FastAPI(
     title="ArchivAI THE BEST AI!",
     description="AI API for ArchivAI",
     version="1.0.0")
+
 # Define allowed origins for CORS
 origins = [
     "http://localhost:3000",
@@ -39,7 +39,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],)
-
 # Authenticate to Azure Key Vault
 credential = DefaultAzureCredential()
 keyvault_name = "vaultarchivai"
@@ -60,8 +59,7 @@ api_version = '2024-08-01-preview'
 client = AzureOpenAI(
     api_key=api_key,
     api_version=api_version,
-    base_url=f"{api_base}/openai/deployments/{deployment_name}"
-)
+    base_url=f"{api_base}/openai/deployments/{deployment_name}")
 # Metadata Extractor Setup
 metadata_extractor = MetadataExtractor(
     client=client,
@@ -149,8 +147,7 @@ def classify_file_bytes(file_bytes: bytes) -> str:
             ] }
         ],
         max_tokens=2000,
-        response_format=classification
-    )
+        response_format=classification)
     result = response.choices[0].message.parsed
     print(result)
 
@@ -263,29 +260,40 @@ async def extract_metadata_endpoint(request: MetadataRequest):
 async def classify_file_endpoint(file: UploadFile = File(...)):
     """
     Endpoint to classify an uploaded File.
-
-    :param file: file uploaded by the user.
-    :return: JSON response with the classification result.
     """
     try:
         # Validate the uploaded file's content type
         if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
             raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
+        
         # Read the file bytes
         file_bytes = await file.read()
+        
         # Check the size of the file (limit to 5MB)
         if len(file_bytes) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+        
+        # Check if model is initialized, if not, try to initialize
+        model, encoder = ModelManager.get_model()
+        if model is None or encoder is None:
+            try:
+                ModelManager.initialize()
+            except Exception as init_error:
+                raise HTTPException(
+                    status_code=503, 
+                    detail=f"Model not available. Please train a model first. Error: {str(init_error)}"
+                )
+        
         # Classify the file bytes
-        path, accuracy ,text_dict = prediction(file_bytes, embedding_client = co_embed)
+        path, accuracy, text_dict = prediction(file_bytes, embedding_client=co_embed)
 
         return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
 
     except ValueError as ve:
         raise HTTPException(status_code=500, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred while processing the file: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"An error occurred while classifying the file: {str(e)}")
+    
 @app.post("/Train-Model")
 async def train_model_endpoint(folder_ids: Optional[list[int]] = None):
     """
