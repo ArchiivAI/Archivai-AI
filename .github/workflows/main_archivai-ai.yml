@@ -64,4 +64,4 @@ jobs:
           slot-name: production
           publish-profile: ${{ secrets.AzureAppService_PublishProfile_91d1169addc74d29a88503ab57e6e219 }}
           images: >
-            archivaidb.azurecr.io/github-archivai:${{ needs.build.outputs.safe_tag }}
+            archivaidb.azurecr.io/github-archivai:latest
