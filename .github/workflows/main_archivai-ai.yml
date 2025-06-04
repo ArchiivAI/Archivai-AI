@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy container app to Azure Web App - archivai-ai
 
 on:
@@ -11,41 +8,60 @@ on:
 
 jobs:
   build:
-    runs-on: 'ubuntu-latest'
+    runs-on: ubuntu-latest
+    outputs:
+      safe_tag: ${{ steps.extract_tag.outputs.SAFE_TAG }}
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      - name: Extract Commit Message and Create Docker Tag
+        id: extract_tag
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%s)
+          # Lowercase + non-alphanumeric → dash
+          SAFE_TAG=$(echo "$COMMIT_MESSAGE" \
+            | tr '[:upper:]' '[:lower:]' \
+            | tr -cs 'a-z0-9' '-' )
+          # Truncate to first 50 chars
+          SAFE_TAG=${SAFE_TAG:0:50}
+          echo "SAFE_TAG=$SAFE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Log in to registry
-      uses: docker/login-action@v2
-      with:
-        registry: https://archivaidb.azurecr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_4bf641efc2d84d34a22a380650794b91 }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
-      with:
-        push: true
-        tags: archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/archivaidb/github-archivai:${{ github.sha }}
-        file: ./Dockerfile
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: archivaidb.azurecr.io
+          username: ${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}
+          password: ${{ secrets.AzureAppService_ContainerPassword_4bf641efc2d84d34a22a380650794b91 }}
+
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: |
+            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/archivaidb/github-archivai:${{ steps.extract_tag.outputs.SAFE_TAG }}
+            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/archivaidb/github-archivai:latest
+          file: ./Dockerfile
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: 'production'
+      name: production
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'archivai-ai'
-        slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_91d1169addc74d29a88503ab57e6e219 }}
-        images: 'archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/archivaidb/github-archivai:${{ github.sha }}'
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: archivai-ai
+          slot-name: production
+          publish-profile: ${{ secrets.AzureAppService_PublishProfile_91d1169addc74d29a88503ab57e6e219 }}
+          images: >
+            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/archivaidb/github-archivai:${{ needs.build.outputs.safe_tag }}
