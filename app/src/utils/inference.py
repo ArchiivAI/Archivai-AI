@@ -6,7 +6,7 @@ from app.src.utils.model_manager import ModelManager
 
 
 
-def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int, float, str, str]:
+async def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int, float, str, str]:
     """
     Classify an image to one of the specified categories.
 
@@ -14,7 +14,7 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int,
     :return: Tuple of (category_path, confidence, markdown_text, raw_text)
     """
     # Extract text from the file bytes
-    result = extract_text(file_bytes, url=False)
+    result = await extract_text(file_bytes, url=False)
 
     # Combine all pages into one markdown and one raw text block
     full_raw = "\n".join(page.raw_text for page in result)

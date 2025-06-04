@@ -302,7 +302,7 @@ async def classify_file_endpoint(file: UploadFile = File(...)):
                 )
         
         # Classify the file bytes
-        path, accuracy, text_dict = prediction(file_bytes, embedding_client=co_embed)
+        path, accuracy, text_dict = await prediction(file_bytes, embedding_client=co_embed)
 
         return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
 
