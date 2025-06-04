@@ -44,8 +44,8 @@ jobs:
         with:
           push: true
           tags: |
-            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/github-archivai:${{ steps.extract_tag.outputs.SAFE_TAG }}
-            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/github-archivai:latest
+            archivaidb.azurecr.io/github-archivai:${{ steps.extract_tag.outputs.SAFE_TAG }}
+            archivaidb.azurecr.io/github-archivai:latest
           file: ./Dockerfile
 
   deploy:
@@ -64,4 +64,4 @@ jobs:
           slot-name: production
           publish-profile: ${{ secrets.AzureAppService_PublishProfile_91d1169addc74d29a88503ab57e6e219 }}
           images: >
-            archivaidb.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_9af74490f468449780f72911332f1ba7 }}/github-archivai:${{ needs.build.outputs.safe_tag }}
+            archivaidb.azurecr.io/github-archivai:${{ needs.build.outputs.safe_tag }}
