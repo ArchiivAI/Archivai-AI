@@ -227,7 +227,7 @@ async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] 
         if url == "None":
             raise HTTPException(status_code=400, detail="URL is required.")
         try:
-            text = extract_text(file=url, url=True)
+            text = await extract_text(file=url, url=True)
             # return JSONResponse(content={"text": text.markdown_text, "raw_text": text.raw_text})
         except ValueError as ve:
             raise HTTPException(status_code=500, detail=str(ve))
@@ -253,7 +253,7 @@ async def extract_text_from_image(url: str = "None", file: Optional[UploadFile] 
                 raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
 
             # Extract text from the file bytes
-            text = extract_text(file_bytes, url=False)
+            text = await extract_text(file_bytes, url=False)
 
         except ValueError as ve:
             raise HTTPException(status_code=500, detail=str(ve))

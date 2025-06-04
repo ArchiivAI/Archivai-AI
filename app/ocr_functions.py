@@ -12,7 +12,6 @@ import base64
 from io import BytesIO
 import fitz
 import asyncio
-import nest_asyncio
 from urllib.parse import urlparse
 import time
 from azure.core.credentials import AzureKeyCredential
@@ -169,7 +168,7 @@ async def main(messages):
     result = await asyncio.gather(*tasks)
     return result
 
-def pdf_ocr(pdf_path, url=False):
+async def pdf_ocr(pdf_path, url=False):
     time_start = time.time()
     images = pdf_to_image_urls(pdf_path, url)
     messages = generate_messages(system_prompt, user_prompt, images)
@@ -177,7 +176,7 @@ def pdf_ocr(pdf_path, url=False):
     print(f"Generated {len(images)} messages in {time_end - time_start:.2f} seconds")
     
     time_start = time.time()
-    final_result = asyncio.run(main(messages))
+    final_result = await main(messages)
     time_end = time.time()
     print(f"Completed OCR in {time_end - time_start:.2f} seconds")
     
@@ -193,16 +192,16 @@ def blob_to_base64(blob):
     # img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
     # return img_str
 
-def image_ocr(blob,url=False):
+async def image_ocr(blob,url=False):
     if url:
         image_url = blob_to_base64(blob)
     else:
         image_url = image_pil_to_data_url(Image.open(blob))
     messages = generate_messages(system_prompt, user_prompt, [image_url])
-    final_result = asyncio.run(main(messages))
+    final_result = await main(messages)
     return final_result
 
-def extract_text(file, url=False):
+async def extract_text(file, url=False):
     if url:
         parsed_url = urlparse(file)
         path_parts = parsed_url.path.lstrip('/').split('/')
@@ -213,9 +212,9 @@ def extract_text(file, url=False):
         blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
         
         if file.endswith(".pdf"):
-            result = pdf_ocr(blob_client, url=url)
+            result = await pdf_ocr(blob_client, url=url)
         elif file.endswith((".png", ".jpg", ".jpeg")):
-            result = image_ocr(blob_client, url=url)
+            result = await image_ocr(blob_client, url=url)
         else:
             raise ValueError("Unsupported file type")
 
@@ -236,14 +235,14 @@ def extract_text(file, url=False):
                     raise ValueError("Unsupported file type")
 
             if file_type == "pdf":
-                result = pdf_ocr(file, url=url)
+                result = await pdf_ocr(file, url=url)
             elif file_type == "image":
-                result = image_ocr(io.BytesIO(file), url=url)
+                result = await image_ocr(io.BytesIO(file), url=url)
         else:
             if file.endswith(".pdf"):
-                result = pdf_ocr(file)
+                result = await pdf_ocr(file)
             elif file.endswith((".png", ".jpg", ".jpeg")):
-                result = image_ocr(file)
+                result = await image_ocr(file)
     return result
 
 def vlm_ocr(endpoint, model_deployment, system_prompt, user_prompt, url):
