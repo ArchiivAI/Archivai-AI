@@ -1,8 +1,8 @@
 # Docker
 # Build and push an image to Azure Container Registry
 
-trigger:
-- main
+trigger: none
+# - main
 pr: none
 
 resources:
