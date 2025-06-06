@@ -108,7 +108,7 @@ class RetrieveRequest(BaseModel):
     k: Optional[int] = 10
 
 class ClearDataRequest(BaseModel):
-    file_id: Optional[int] = None  # If None, clear all documents
+    file_id: List[int] | int | None = None  # If None, clear all documents
 
 # Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:

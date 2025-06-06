@@ -146,7 +146,7 @@ class RAGService:
                 "message": f"Failed to get collection stats: {str(e)}"
             }
 
-    def clear_data(self, file_id: Optional[int] = None) -> dict:
+    def clear_data(self, file_id: List[int] | int | None = None) -> dict:
         """
         Clear documents from the vector database.
         
@@ -184,8 +184,24 @@ class RAGService:
                     "file_id": None
                 }
             else:
-                results = collection.get(where={"file_id": file_id}, include=[]) # include=[] for efficiency
+                # if file_id is int, convert to list
+                if isinstance(file_id, int):
+                    file_id = [file_id]
+
+                if len(file_id) == 0:
+                    return {
+                        "status": "warning",
+                        "message": "No file_id provided to clear.",
+                        "deleted_count": 0,
+                        "file_id": None
+                    }
                 
+                if len(file_id) > 1:
+                    query = {"$or": [{"file_id": fid} for fid in file_id]}
+                else:
+                    query = {"file_id": file_id[0]}
+                results = collection.get(where=query, include=[]) # include=[] for efficiency
+
                 ids_to_delete = results["ids"]
                 
                 if not ids_to_delete:

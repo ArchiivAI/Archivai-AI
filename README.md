@@ -341,24 +341,24 @@ Retrieves relevant document `file_id`s based on a natural language question and 
 ### 3. `POST /rag/clear`
 
 **Description:**
-Clears documents from the vector database. Can clear all documents or documents associated with a specific `file_id`.
+Clears documents from the vector database. Can clear all documents or documents associated with specific `file_id`s.
 
 **Request Body:**
 - Content-Type: `application/json`
 ```json
 {
-  "file_id": 123
+  "file_id": [123, 456]
 }
 ```
-- `file_id` (optional): If provided, only documents with this `file_id` will be deleted. If `null` or omitted, all documents in the collection will be cleared.
+- `file_id` (optional): Can be a single integer or a list of integers. If provided, only documents with these `file_id`s will be deleted. If `null` or omitted, all documents in the collection will be cleared.
 
-**Response Example (Success - Specific `file_id`):**
+**Response Example (Success - Specific `file_id`s):**
 ```json
 {
   "status": "success",
-  "message": "Deleted 2 documents with file_id 123",
-  "deleted_count": 2,
-  "file_id": 123
+  "message": "Deleted 3 documents with file_id [123, 456]",
+  "deleted_count": 3,
+  "file_id": [123, 456]
 }
 ```
 
@@ -372,13 +372,13 @@ Clears documents from the vector database. Can clear all documents or documents 
 }
 ```
 
-**Response Example (Warning - No documents found for `file_id`):**
+**Response Example (Warning - No documents found for `file_id`s):**
 ```json
 {
   "status": "warning",
-  "message": "No documents found with file_id 789",
+  "message": "No documents found with file_id [789]",
   "deleted_count": 0,
-  "file_id": 789
+  "file_id": [789]
 }
 ```
 
@@ -394,7 +394,7 @@ Clears documents from the vector database. Can clear all documents or documents 
   {
     "status": "error",
     "message": "Failed to clear documents: <error_message>",
-    "file_id": 123
+    "file_id": [123, 456]
   }
   ```
 
