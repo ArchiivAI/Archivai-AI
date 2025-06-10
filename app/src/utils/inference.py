@@ -1,13 +1,12 @@
 import torch
-import os
 import cohere
-from app.src.utils.classifier import TextClassifier
-from app.src.utils.config import encoder, checkpoint
 from app.ocr_functions import extract_text
+from app.src.utils.model_manager import ModelManager
 
 
 
-def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int, float, str, str]:
+
+async def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int, float, str, str]:
     """
     Classify an image to one of the specified categories.
 
@@ -15,7 +14,7 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int,
     :return: Tuple of (category_path, confidence, markdown_text, raw_text)
     """
     # Extract text from the file bytes
-    result = extract_text(file_bytes, url=False)
+    result = await extract_text(file_bytes, url=False)
 
     # Combine all pages into one markdown and one raw text block
     full_raw = "\n".join(page.raw_text for page in result)
@@ -32,10 +31,13 @@ def prediction(file_bytes: bytes, embedding_client: cohere.Client) -> tuple[int,
     # creating a pytorch tensor
     embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
    
-    # Load the model from the checkpoint
-    model = TextClassifier(num_classes= len(encoder.classes_))
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()  # Set to evaluation mode
+    # set the model to evaluation mode
+    model, encoder = ModelManager.get_model()
+    
+    # Move the model to the appropriate device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    embeddings_tensor = embeddings_tensor.to(device)
     
     # Get predictions and confidence scores
     with torch.no_grad():

@@ -1,7 +1,5 @@
 import os
-import torch
 from dotenv import load_dotenv
-import joblib
 import sys
 
 # load .env file
@@ -18,11 +16,8 @@ ASSETS_PATH = os.path.join(BASE_DIR, 'assets')
 # Add the project root to Python path
 sys.path.append(str(BASE_DIR))
 
-# get the latest checkpoint
-checkpoint_path = os.path.join(ASSETS_PATH, "best_model.pth")
-checkpoint = torch.load(checkpoint_path)
-
 # get the encoder 
 encoder_path = os.path.join(ASSETS_PATH, "label_encoder.pkl")
-encoder = joblib.load(encoder_path)
 
+# get the latest checkpoint
+checkpoint_path = os.path.join(ASSETS_PATH, "best_model.pth")

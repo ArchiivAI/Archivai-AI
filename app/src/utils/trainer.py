@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 from typing import Tuple
 from app.src.utils.config import checkpoint_path
 import time
+from app.src.utils.model_manager import ModelManager
 
 class Trainer:
     def __init__(self, model, criterion, optimizer, scheduler, device,
@@ -96,7 +97,9 @@ class Trainer:
                     'best_val_loss': best_val_loss
                 }, checkpoint_path)
                 print("Early stopping triggered!")
+                ModelManager.update_model(new_model=self.model)
                 break
+            
         # returning the time taken for training
         end_time = time.time()
         yield f"Training completed in {end_time - start_time:.2f} seconds.\n\n\n"   
