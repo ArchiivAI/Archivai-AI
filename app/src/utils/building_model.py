@@ -12,6 +12,8 @@ import psycopg2
 import pandas as pd
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
+from app.src.utils.model_manager import ModelManager
+
 
 def train_model(chere_client: cohere.Client, folder_ids: list = None):
         
@@ -71,6 +73,9 @@ def train_model(chere_client: cohere.Client, folder_ids: list = None):
 
     # Save the trained encoder
     joblib.dump(encoder, encoder_path)
+
+    # updating the model manager
+    ModelManager.update_model(new_encoder=encoder)
 
     # converting to torch tensor
     embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32)
