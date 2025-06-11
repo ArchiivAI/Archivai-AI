@@ -4,7 +4,8 @@ WORKDIR /code
 
 COPY ./requirements.txt /code/requirements.txt
 
-RUN pip install -r requirements.txt
+RUN command -v uv || pip install uv
+RUN uv pip install -r requirements.txt
 
 COPY  ./app /code/app
 
