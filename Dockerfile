@@ -5,10 +5,8 @@ WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
 
 RUN pip install uv
-RUN uv venv /opt/venv
-RUN /opt/venv/bin/uv pip install -r requirements.txt
 
-# RUN uv pip install -r requirements.txt
+RUN uv pip install --system -r requirements.txt
 
 COPY  ./app /code/app
 
