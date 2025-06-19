@@ -4,11 +4,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import logging
 from datetime import datetime
-
+import os
 # Import training function
 from train_app.train_script import train_model, get_training_status
-from train_app.config import config  # Import the global config instance
-
+from train_app.config import config 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,7 +47,7 @@ class ConfigEditRequest(BaseModel):
     num_epochs: Optional[int] = Field(None, description="Number of training epochs")
     classifier_dropout: Optional[float] = Field(None, description="Dropout rate for the classifier")
 
-
+os.environ["Training_Lock"] = "False"  # Initialize training lock
 # Hello world endpoint
 @app.get("/", tags=["Root"])
 async def read_root():
@@ -56,9 +55,6 @@ async def read_root():
     Root endpoint to check if the API is running.
     """
     return {"message": "Welcome to the Jina AI Classification API!"}
-
-# Global variable to track training lock
-training_lock = False
 
 @app.post("/train", response_model=TrainingResponse)
 async def start_training(request: TrainingRequest, background_tasks: BackgroundTasks):
@@ -69,18 +65,16 @@ async def start_training(request: TrainingRequest, background_tasks: BackgroundT
     - **output_dir**: Directory to save model checkpoints (default: "output/jina_classification")
     - **run_name**: Name for the MLflow run (default: "jina_classification_training")
     """
-    global training_lock
 
-    if training_lock:
+    if os.getenv("Training_Lock") == "True":
         logger.warning("Training is already in progress. Cannot start a new training session.")
         raise HTTPException(status_code=400, detail="Training is already in progress. Please wait for it to complete.")
-
     try:
         logger.info(f"Starting training with folder_ids: {request.folder_ids}, output_dir: {request.output_dir}, run_name: {request.run_name}")
         
         # Set the training lock
-        training_lock = True
-        
+        os.environ["Training_Lock"] = "True"
+
         # Add the training function to background tasks
         background_tasks.add_task(
             train_model,
@@ -100,9 +94,6 @@ async def start_training(request: TrainingRequest, background_tasks: BackgroundT
     except Exception as e:
         logger.error(f"Failed to start training: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start training: {str(e)}")
-    finally:
-        # Release the training lock after the background task completes
-        training_lock = False
 
 @app.get("/training-status", tags=["Training"])
 async def get_status():
@@ -151,8 +142,6 @@ async def edit_config(request: ConfigEditRequest):
             }
         }
     except Exception as e:
-        logger.error(f"Failed to update configuration: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
         logger.error(f"Failed to update configuration: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
 

@@ -23,9 +23,8 @@ from train_app.train_classes import (
 from train_app.data_preprocessing import load_and_preprocess_data, tokenize_dataset, preprocess_data_db, fetch_data_from_db
 from train_app.model_saving import ModelSaver
 from train_app.config import config  
-from train_app.main import training_lock
 import requests
-
+import os
 # init Azure secret client
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
@@ -104,7 +103,6 @@ def get_training_status():
 
 def train_model(folder_ids: list = None, output_dir: str = "output/jina_classification", run_name: str = "jina_classification_training"):
     global training_status
-    global training_lock 
 
     try:
         # Use the global config instance
@@ -252,7 +250,7 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
         raise e
     finally:
         # Release the training lock
-        training_lock = False
+        os.environ["Training_Lock"] = "False"
 
 def main():
     # Test the training function
