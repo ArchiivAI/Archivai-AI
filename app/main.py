@@ -20,6 +20,8 @@ from app.src.utils.inference import prediction
 from app.src.utils.building_model import train_model
 from fastapi.responses import StreamingResponse
 from app.src.utils.model_manager import ModelManager
+from app.train_app.model_saving import ModelSaver
+from app.inference_module import ModelConfig, predict
 
 # FastAPI application instance
 app = FastAPI(
@@ -332,6 +334,47 @@ async def train_model_endpoint(folder_ids: Optional[list[int]] = None):
         except Exception as e:
             yield f"An error occurred during training: {str(e)}"    # Return a streaming response
     return StreamingResponse(massage_generator(), media_type="text/plain")
+
+@app.get("/load-model")
+async def load_model_endpoint():
+    """
+    Endpoint to load the model from disk.
+    This endpoint is used to load the model after training.
+    Returns:
+        JSON response with model loading status
+    """
+    try:
+        ModelConfig.load_model()
+        return JSONResponse(content={"status": "Model loaded successfully"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while loading the model: {str(e)}")
+
+@app.post("/predict-file")
+async def predict_file_endpoint(file: UploadFile = File(...)):
+    """
+    Endpoint to classify an uploaded file.
+    """
+    try:
+        # Validate the uploaded file's content type
+        if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPEG, and PDF are supported.")
+
+        # Read the file bytes
+        file_bytes = await file.read()
+
+        # Check the size of the file (limit to 5MB)
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+
+        # Classify the file bytes
+        path, accuracy, text_dict = await predict(file_bytes)
+
+        return JSONResponse(content={"path": path, "accuracy": accuracy, "text_dicts": text_dict})
+
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while classifying the file: {str(e)}")
 
 # ========== RAG ENDPOINTS ==========
 
