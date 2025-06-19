@@ -207,11 +207,14 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     # load the model
     url = "https://archivai-ai.azurewebsites.net/load-model"
     status = requests.get(url)
+    print(f"Model load status: {status.status_code}, Response: {status.text}")
     return {
         "Status": "Training completed successfully",
         "Run ID": run_id,
         "Checkpoint Name": checkpoint_name,
         "Best Metric": best_metric,
+        "Model Load Status": status.status_code,
+        "Model Load Response": status.text
     }
 
 def main():
