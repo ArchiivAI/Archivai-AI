@@ -58,9 +58,9 @@ async def read_root():
     return {"message": "Welcome to the Jina AI Classification API!"}
 
 @app.post("/train", response_model=TrainingResponse)
-async def start_training(request: TrainingRequest):
+async def start_training(request: TrainingRequest, background_tasks: BackgroundTasks):
     """
-    Start training a model.
+    Start training a model as a background task.
     
     - **folder_ids**: List of folder IDs to fetch training data from (optional)
     - **output_dir**: Directory to save model checkpoints (default: "output/jina_classification")
@@ -69,25 +69,25 @@ async def start_training(request: TrainingRequest):
     try:
         logger.info(f"Starting training with folder_ids: {request.folder_ids}, output_dir: {request.output_dir}, run_name: {request.run_name}")
         
-        # Call the training function directly
-        result = train_model(
+        # Add the training function to background tasks
+        background_tasks.add_task(
+            train_model,
             folder_ids=request.folder_ids,
             output_dir=request.output_dir,
             run_name=request.run_name
         )
         
-        logger.info("Training completed successfully")
+        logger.info("Training started as a background task")
         
         return TrainingResponse(
-            status="completed",
-            message="Training completed successfully",
-            result=result,
+            status="in_progress",
+            message="Training started as a background task",
             timestamp=datetime.now()
         )
         
     except Exception as e:
-        logger.error(f"Training failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+        logger.error(f"Failed to start training: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start training: {str(e)}")
 
 @app.get("/training-status", tags=["Training"])
 async def get_status():
