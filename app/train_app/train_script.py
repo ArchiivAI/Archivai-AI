@@ -22,7 +22,8 @@ from train_app.train_classes import (
 )
 from train_app.data_preprocessing import load_and_preprocess_data, tokenize_dataset, preprocess_data_db, fetch_data_from_db
 from train_app.model_saving import ModelSaver
-from train_app.config import config  # Import the global config instance
+from train_app.config import config  
+from train_app.main import training_lock
 import requests
 
 # init Azure secret client
@@ -103,145 +104,155 @@ def get_training_status():
 
 def train_model(folder_ids: list = None, output_dir: str = "output/jina_classification", run_name: str = "jina_classification_training"):
     global training_status
-    # Use the global config instance
-    print("=== Starting Jina AI Classification Training ===")
-    training_status = "Starting Jina AI Classification Training"
-    
-    # 1. Load the data
-    print("1. Loading data...")
-    training_status = "Preprocessing data..."
-    df = fetch_data_from_db(folder_ids)
-    if df.empty:
-        print("No data found for the specified FolderIds.")
-        training_status = "No data found for the specified FolderIds."
-        return  
+    global training_lock 
 
-    # Preprocess the data
-    print("Preprocessing data...")
-    hf_dataset, class_weights_tensor, num_labels, id2label, label2id = preprocess_data_db(df)
-    print(f"Number of labels: {num_labels}")
-    
-    # 2. Create model configuration
-    print("2. Creating model configuration...")
-    training_status = "Creating model configuration..."
-    model_config = config.create_model_config(num_labels, id2label, label2id)
-    
-    # 3. Load tokenizer
-    print("3. Loading tokenizer...")
-    training_status = "Loading tokenizer..."
-    tokenizer = AutoTokenizer.from_pretrained(config.BASE_MODEL_NAME, trust_remote_code=True)
-    
-    # 4. Create model
-    print("4. Creating custom model...")
-    training_status = "Creating custom model..."
-    # Register custom classes
-    AutoConfig.register("jina_ai_classification", JinaAIClassificationConfig)
-    AutoModel.register(JinaAIClassificationConfig, JinaAIForSequenceClassification)
-    
-    model = JinaAIForSequenceClassification(config=model_config)
-    
-    # Ensure classification head is trainable
-    for name, param in model.classifier.named_parameters():
-        param.requires_grad = True
-    for name, param in model.dropout.named_parameters():
-        param.requires_grad = True
-    
-    # Count trainable parameters
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"Total parameters: {total_params:,}")
-    print(f"Trainable parameters: {trainable_params:,}")
-    
-    # 5. Tokenize dataset
-    print("5. Tokenizing dataset...")
-    training_status = "Tokenizing dataset..."
-    train_dataset, eval_dataset = tokenize_dataset(hf_dataset, tokenizer, config.MAX_LENGTH)
-    
-    if run_name is None:
-        run_name = "jina_classification_training"
-    
-    # 7. Setup training arguments
-    print("7. Setting up training arguments...")
-    training_status = "Setting up training arguments..."
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        logging_dir=config.LOG_DIR,
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        learning_rate=config.LEARNING_RATE,
-        per_device_train_batch_size=config.BATCH_SIZE,
-        per_device_eval_batch_size=config.BATCH_SIZE,
-        num_train_epochs=config.NUM_EPOCHS,
-        fp16=False,
-        load_best_model_at_end=True,
-        weight_decay=0.01,
-        warmup_ratio=0.1,
-        report_to='none',
-        logging_steps=10,
-        logging_first_step=True,
-        log_level='info',
-        disable_tqdm=False,
-        seed=42,
-        run_name=run_name,
-    )
-    
-    # 8. Initialize trainer
-    print("8. Initializing trainer...")
-    training_status = "Initializing trainer..."
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,  # For testing with smaller dataset
-        eval_dataset=eval_dataset,
-        processing_class=tokenizer,
-        compute_metrics=compute_metrics,
-        callbacks=[CustomMLflowCallback()],
-    )
-    
-    # 9. Train the model
-    print("9. Starting training...")
-    training_status = "Starting training..."
     try:
-        trainer.train()
+        # Use the global config instance
+        print("=== Starting Jina AI Classification Training ===")
+        training_status = "Starting Jina AI Classification Training"
+        
+        # 1. Load the data
+        print("1. Loading data...")
+        training_status = "Preprocessing data..."
+        df = fetch_data_from_db(folder_ids)
+        if df.empty:
+            print("No data found for the specified FolderIds.")
+            training_status = "No data found for the specified FolderIds."
+            return  
+
+        # Preprocess the data
+        print("Preprocessing data...")
+        hf_dataset, class_weights_tensor, num_labels, id2label, label2id = preprocess_data_db(df)
+        print(f"Number of labels: {num_labels}")
+        
+        # 2. Create model configuration
+        print("2. Creating model configuration...")
+        training_status = "Creating model configuration..."
+        model_config = config.create_model_config(num_labels, id2label, label2id)
+        
+        # 3. Load tokenizer
+        print("3. Loading tokenizer...")
+        training_status = "Loading tokenizer..."
+        tokenizer = AutoTokenizer.from_pretrained(config.BASE_MODEL_NAME, trust_remote_code=True)
+        
+        # 4. Create model
+        print("4. Creating custom model...")
+        training_status = "Creating custom model..."
+        # Register custom classes
+        AutoConfig.register("jina_ai_classification", JinaAIClassificationConfig)
+        AutoModel.register(JinaAIClassificationConfig, JinaAIForSequenceClassification)
+        
+        model = JinaAIForSequenceClassification(config=model_config)
+        
+        # Ensure classification head is trainable
+        for name, param in model.classifier.named_parameters():
+            param.requires_grad = True
+        for name, param in model.dropout.named_parameters():
+            param.requires_grad = True
+        
+        # Count trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in model.parameters())
+        print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
+        
+        # 5. Tokenize dataset
+        print("5. Tokenizing dataset...")
+        training_status = "Tokenizing dataset..."
+        train_dataset, eval_dataset = tokenize_dataset(hf_dataset, tokenizer, config.MAX_LENGTH)
+        
+        if run_name is None:
+            run_name = "jina_classification_training"
+        
+        # 7. Setup training arguments
+        print("7. Setting up training arguments...")
+        training_status = "Setting up training arguments..."
+        training_args = TrainingArguments(
+            output_dir=output_dir,
+            logging_dir=config.LOG_DIR,
+            eval_strategy="epoch",
+            save_strategy="epoch",
+            learning_rate=config.LEARNING_RATE,
+            per_device_train_batch_size=config.BATCH_SIZE,
+            per_device_eval_batch_size=config.BATCH_SIZE,
+            num_train_epochs=config.NUM_EPOCHS,
+            fp16=False,
+            load_best_model_at_end=True,
+            weight_decay=0.01,
+            warmup_ratio=0.1,
+            report_to='none',
+            logging_steps=10,
+            logging_first_step=True,
+            log_level='info',
+            disable_tqdm=False,
+            seed=42,
+            run_name=run_name,
+        )
+        
+        # 8. Initialize trainer
+        print("8. Initializing trainer...")
+        training_status = "Initializing trainer..."
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,  # For testing with smaller dataset
+            eval_dataset=eval_dataset,
+            processing_class=tokenizer,
+            compute_metrics=compute_metrics,
+            callbacks=[CustomMLflowCallback()],
+        )
+        
+        # 9. Train the model
+        print("9. Starting training...")
+        training_status = "Training in progress..."
+        try:
+            trainer.train()
+        except Exception as e:
+            print(f"Error occurred during training: {e}")
+            training_status = f"Error occurred during training: {e}"
+            return
+
+        # 10. Save the final model
+        print("10. Saving final model...")
+        training_status = "Saving final model..."
+        model_save = ModelSaver()
+        run_id = os.getenv("MLFLOW_RUN_ID_CAPTURED")
+        checkpoint_name = trainer.state.best_model_checkpoint.split('/')[-1]
+        log_history = trainer.state.log_history
+        best_metric = trainer.state.best_metric
+        model_save.save_model(
+            name=run_name,
+            run_id=run_id,
+            checkpoint_name=checkpoint_name,
+            log_history=log_history,
+            best_metric=best_metric,
+        )
+        print("Training completed successfully!")
+        training_status = "Training completed successfully!"
+        
+        # load the model
+        training_status = "Loading the model..."
+        base_url = keys_client.get_secret("archivai-ai-base-endpoint").value
+        endpoint = "load-model"
+        url = f"{base_url}/{endpoint}"
+        status = requests.get(url)
+        training_status = "Training completed successfully!"
+        print(f"Model load status: {status.status_code}, Response: {status.text}")
+        return {
+            "Status": "Training completed successfully",
+            "Run ID": run_id,
+            "Checkpoint Name": checkpoint_name,
+            "Best Metric": best_metric,
+            "Model Load Status": status.status_code,
+            "Model Load Response": status.text
+        }
     except Exception as e:
         print(f"Error occurred during training: {e}")
         training_status = f"Error occurred during training: {e}"
-        return
-
-    # 10. Save the final model
-    print("10. Saving final model...")
-    training_status = "Saving final model..."
-    model_save = ModelSaver()
-    run_id = os.getenv("MLFLOW_RUN_ID_CAPTURED")
-    checkpoint_name = trainer.state.best_model_checkpoint.split('/')[-1]
-    log_history = trainer.state.log_history
-    best_metric = trainer.state.best_metric
-    model_save.save_model(
-        name=run_name,
-        run_id=run_id,
-        checkpoint_name=checkpoint_name,
-        log_history=log_history,
-        best_metric=best_metric,
-    )
-    print("Training completed successfully!")
-    training_status = "Training completed successfully!"
-    
-    # load the model
-    training_status = "Loading the model..."
-    base_url = keys_client.get_secret("archivai-ai-base-endpoint").value
-    endpoint = "load-model"
-    url = f"{base_url}/{endpoint}"
-    status = requests.get(url)
-    training_status = "Training completed successfully!"
-    print(f"Model load status: {status.status_code}, Response: {status.text}")
-    return {
-        "Status": "Training completed successfully",
-        "Run ID": run_id,
-        "Checkpoint Name": checkpoint_name,
-        "Best Metric": best_metric,
-        "Model Load Status": status.status_code,
-        "Model Load Response": status.text
-    }
+        raise e
+    finally:
+        # Release the training lock
+        training_lock = False
 
 def main():
     # Test the training function

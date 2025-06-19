@@ -57,6 +57,9 @@ async def read_root():
     """
     return {"message": "Welcome to the Jina AI Classification API!"}
 
+# Global variable to track training lock
+training_lock = False
+
 @app.post("/train", response_model=TrainingResponse)
 async def start_training(request: TrainingRequest, background_tasks: BackgroundTasks):
     """
@@ -66,8 +69,17 @@ async def start_training(request: TrainingRequest, background_tasks: BackgroundT
     - **output_dir**: Directory to save model checkpoints (default: "output/jina_classification")
     - **run_name**: Name for the MLflow run (default: "jina_classification_training")
     """
+    global training_lock
+
+    if training_lock:
+        logger.warning("Training is already in progress. Cannot start a new training session.")
+        raise HTTPException(status_code=400, detail="Training is already in progress. Please wait for it to complete.")
+
     try:
         logger.info(f"Starting training with folder_ids: {request.folder_ids}, output_dir: {request.output_dir}, run_name: {request.run_name}")
+        
+        # Set the training lock
+        training_lock = True
         
         # Add the training function to background tasks
         background_tasks.add_task(
@@ -88,6 +100,9 @@ async def start_training(request: TrainingRequest, background_tasks: BackgroundT
     except Exception as e:
         logger.error(f"Failed to start training: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start training: {str(e)}")
+    finally:
+        # Release the training lock after the background task completes
+        training_lock = False
 
 @app.get("/training-status", tags=["Training"])
 async def get_status():
