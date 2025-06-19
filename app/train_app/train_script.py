@@ -22,7 +22,7 @@ from train_app.train_classes import (
 )
 from train_app.data_preprocessing import load_and_preprocess_data, tokenize_dataset, preprocess_data_db, fetch_data_from_db
 from train_app.model_saving import ModelSaver
-from train_app.config import Config
+from train_app.config import config  # Import the global config instance
 import requests
 # Load environment variables
 load_dotenv()
@@ -83,25 +83,28 @@ def compute_metrics(eval_pred):
 
 
 
+# Global variable to track training status
+training_status = "Idle"
+
+def get_training_status():
+    """
+    Returns the current status of the training process.
+    """
+    return training_status
+
 def train_model(folder_ids: list = None, output_dir: str = "output/jina_classification", run_name: str = "jina_classification_training"):
-    """
-    Main training function.
-    
-    Args:
-        folder_ids (list): List of folder IDs to fetch data from
-        output_dir (str): Output directory for model checkpoints
-        run_name (str): MLflow run name
-    """
-    # Initialize config
-    config = Config()
-    
+    global training_status
+    # Use the global config instance
     print("=== Starting Jina AI Classification Training ===")
+    training_status = "Starting Jina AI Classification Training"
     
     # 1. Load the data
     print("1. Loading data...")
+    training_status = "Preprocessing data..."
     df = fetch_data_from_db(folder_ids)
     if df.empty:
         print("No data found for the specified FolderIds.")
+        training_status = "No data found for the specified FolderIds."
         return  
 
     # Preprocess the data
@@ -111,14 +114,17 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # 2. Create model configuration
     print("2. Creating model configuration...")
+    training_status = "Creating model configuration..."
     model_config = config.create_model_config(num_labels, id2label, label2id)
     
     # 3. Load tokenizer
     print("3. Loading tokenizer...")
+    training_status = "Loading tokenizer..."
     tokenizer = AutoTokenizer.from_pretrained(config.BASE_MODEL_NAME, trust_remote_code=True)
     
     # 4. Create model
     print("4. Creating custom model...")
+    training_status = "Creating custom model..."
     # Register custom classes
     AutoConfig.register("jina_ai_classification", JinaAIClassificationConfig)
     AutoModel.register(JinaAIClassificationConfig, JinaAIForSequenceClassification)
@@ -139,6 +145,7 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # 5. Tokenize dataset
     print("5. Tokenizing dataset...")
+    training_status = "Tokenizing dataset..."
     train_dataset, eval_dataset = tokenize_dataset(hf_dataset, tokenizer, config.MAX_LENGTH)
     
     if run_name is None:
@@ -146,6 +153,7 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # 7. Setup training arguments
     print("7. Setting up training arguments...")
+    training_status = "Setting up training arguments..."
     training_args = TrainingArguments(
         output_dir=output_dir,
         logging_dir=config.LOG_DIR,
@@ -170,6 +178,7 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # 8. Initialize trainer
     print("8. Initializing trainer...")
+    training_status = "Initializing trainer..."
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -182,14 +191,17 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # 9. Train the model
     print("9. Starting training...")
+    training_status = "Starting training..."
     try:
         trainer.train()
     except Exception as e:
         print(f"Error occurred during training: {e}")
+        training_status = f"Error occurred during training: {e}"
         return
 
     # 10. Save the final model
     print("10. Saving final model...")
+    training_status = "Saving final model..."
     model_save = ModelSaver()
     run_id = os.getenv("MLFLOW_RUN_ID_CAPTURED")
     checkpoint_name = trainer.state.best_model_checkpoint.split('/')[-1]
@@ -203,10 +215,13 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
         best_metric=best_metric,
     )
     print("Training completed successfully!")
+    training_status = "Training completed successfully!"
     
     # load the model
+    training_status = "Loading the model..."
     url = "https://archivai-ai.azurewebsites.net/load-model"
     status = requests.get(url)
+    training_status = "Training completed successfully!"
     return {
         "Status": "Training completed successfully",
         "Run ID": run_id,

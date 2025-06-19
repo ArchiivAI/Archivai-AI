@@ -6,7 +6,8 @@ import logging
 from datetime import datetime
 
 # Import training function
-from train_app.train_script import train_model
+from train_app.train_script import train_model, get_training_status
+from train_app.config import config  # Import the global config instance
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,13 @@ class TrainingResponse(BaseModel):
     message: str
     result: Optional[Dict[str, Any]] = None
     timestamp: datetime
+
+class ConfigEditRequest(BaseModel):
+    batch_size: Optional[int] = Field(None, description="Batch size for training")
+    max_length: Optional[int] = Field(None, description="Maximum sequence length")
+    learning_rate: Optional[float] = Field(None, description="Learning rate for training")
+    num_epochs: Optional[int] = Field(None, description="Number of training epochs")
+    classifier_dropout: Optional[float] = Field(None, description="Dropout rate for the classifier")
 
 
 # Hello world endpoint
@@ -80,3 +88,56 @@ async def start_training(request: TrainingRequest):
     except Exception as e:
         logger.error(f"Training failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+
+@app.get("/training-status", tags=["Training"])
+async def get_status():
+    """
+    Endpoint to get the current status of the training process.
+    """
+    status = get_training_status()
+    return {"status": status}
+
+@app.post("/edit-config", tags=["Config"])
+
+async def edit_config(request: ConfigEditRequest):
+    """
+    Endpoint to edit the model configuration parameters.
+    
+    - **batch_size**: Batch size for training (optional)
+    - **max_length**: Maximum sequence length (optional)
+    - **learning_rate**: Learning rate for training (optional)
+    - **num_epochs**: Number of training epochs (optional)
+    - **classifier_dropout**: Dropout rate for the classifier (optional)
+    """
+    try:
+        # Update configuration parameters if provided
+        if request.batch_size is not None:
+            config.BATCH_SIZE = request.batch_size
+        if request.max_length is not None:
+            config.MAX_LENGTH = request.max_length
+        if request.learning_rate is not None:
+            config.LEARNING_RATE = request.learning_rate
+        if request.num_epochs is not None:
+            config.NUM_EPOCHS = request.num_epochs
+        if request.classifier_dropout is not None:
+            config.CLASSIFIER_DROPOUT = request.classifier_dropout
+        
+        logger.info("Configuration updated successfully")
+        
+        return {
+            "status": "success",
+            "message": "Configuration updated successfully",
+            "updated_config": {
+                "BATCH_SIZE": config.BATCH_SIZE,
+                "MAX_LENGTH": config.MAX_LENGTH,
+                "LEARNING_RATE": config.LEARNING_RATE,
+                "NUM_EPOCHS": config.NUM_EPOCHS,
+                "CLASSIFIER_DROPOUT": config.CLASSIFIER_DROPOUT
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to update configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
+        logger.error(f"Failed to update configuration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
+
