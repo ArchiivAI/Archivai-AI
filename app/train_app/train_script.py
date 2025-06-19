@@ -23,7 +23,7 @@ from train_app.train_classes import (
 from train_app.data_preprocessing import load_and_preprocess_data, tokenize_dataset, preprocess_data_db, fetch_data_from_db
 from train_app.model_saving import ModelSaver
 from train_app.config import Config
-
+import requests
 # Load environment variables
 load_dotenv()
 
@@ -203,6 +203,10 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
         best_metric=best_metric,
     )
     print("Training completed successfully!")
+    
+    # load the model
+    url = "https://archivai-ai.azurewebsites.net/load-model"
+    status = requests.get(url)
     return {
         "Status": "Training completed successfully",
         "Run ID": run_id,
