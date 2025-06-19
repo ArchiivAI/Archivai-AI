@@ -20,7 +20,6 @@ from app.src.utils.inference import prediction
 from app.src.utils.building_model import train_model
 from fastapi.responses import StreamingResponse
 from app.src.utils.model_manager import ModelManager
-from app.train_app.model_saving import ModelSaver
 from app.inference_module import ModelConfig, predict
 
 # FastAPI application instance
@@ -29,31 +28,37 @@ app = FastAPI(
     description="AI API for ArchivAI",
     version="1.0.0")
 
-# Define allowed origins for CORS
+
+# config Cors
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://ccdtr14p-3000.uks1.devtunnels.ms",
     "https://syntaxsquad-ai.azurewebsites.net"]
-# config Cors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],)
+
+
 # Authenticate to Azure Key Vault
 credential = DefaultAzureCredential()
 keyvault_name = "vaultarchivai"
 kv_uri = f"https://{keyvault_name}.vault.azure.net"
 keys_client = SecretClient(vault_url=kv_uri, credential=credential)
+
 # get Cohere credentials from Azure Key Vault
 cohere_api_key = keys_client.get_secret("CO-API-KEY").value
 cohere_endpoint = keys_client.get_secret("AZURE-ML-COHERE-EMBED-ENDPOINT").value
+
 # making embeddings client 
 co_embed = cohere.Client(
     api_key=cohere_api_key,
     base_url=cohere_endpoint,)
+
+
 # Authenticate to Azure OpenAI
 api_base = keys_client.get_secret("archivai-openai-base").value
 api_key= keys_client.get_secret("archivaigpt4-key").value
@@ -63,6 +68,9 @@ client = AzureOpenAI(
     api_key=api_key,
     api_version=api_version,
     base_url=f"{api_base}/openai/deployments/{deployment_name}")
+
+# load the model
+ModelConfig.load_model()
 # Metadata Extractor Setup
 metadata_extractor = MetadataExtractor(
     client=client,
@@ -111,7 +119,6 @@ class RetrieveRequest(BaseModel):
 class ClearDataRequest(BaseModel):
     file_id: List[int] | int | None = None  # If None, clear all documents
 
-# Define the classification function
 def classify_file_bytes(file_bytes: bytes) -> str:
     """
     Classify an image to one of the specified categories.
@@ -177,7 +184,7 @@ def classify_file_bytes(file_bytes: bytes) -> str:
 
 @app.get("/")
 def hello_world():
-    return {"message":"Hello World!ٌ Image Test"}
+    return {"message":"Hello World!ٌ load model first!"}
 
 @app.post("/classify-image/")
 async def classify_image_endpoint(file: UploadFile = File(...)):
