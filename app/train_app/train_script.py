@@ -24,6 +24,15 @@ from train_app.data_preprocessing import load_and_preprocess_data, tokenize_data
 from train_app.model_saving import ModelSaver
 from train_app.config import config  # Import the global config instance
 import requests
+
+# init Azure secret client
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+credential = DefaultAzureCredential()
+keyvault_name = "vaultarchivai"
+kv_uri = f"https://{keyvault_name}.vault.azure.net"
+keys_client = SecretClient(vault_url=kv_uri, credential=credential)
+
 # Load environment variables
 load_dotenv()
 
@@ -219,7 +228,9 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
     
     # load the model
     training_status = "Loading the model..."
-    url = "https://archivai-ai.azurewebsites.net/load-model"
+    base_url = keys_client.get_secret("archivai-ai-base-endpoint").value
+    endpoint = "load-model"
+    url = f"{base_url}/{endpoint}"
     status = requests.get(url)
     training_status = "Training completed successfully!"
     print(f"Model load status: {status.status_code}, Response: {status.text}")
