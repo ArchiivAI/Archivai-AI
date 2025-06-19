@@ -1,0 +1,17 @@
+transformers
+accelerate
+datasets
+pandas
+numpy
+scikit-learn
+evaluate
+mlflow
+python-dotenv
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
+azureml-fsspec
+azure-ai-ml
+azureml-sdk
+psycopg2
+
