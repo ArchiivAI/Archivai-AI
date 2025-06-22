@@ -99,11 +99,18 @@ curl -X POST "http://<host>:8000/extract-text/" \
 [
   {
     "markdown_text": "Extracted text in markdown format...",
-    "raw_text": "Extracted raw text..."
+    "raw_text": "Extracted raw text...",
+    "language": "english"
   },
   ...
 ]
 ```
+
+**Notes:**
+- The `language` field indicates the language of the extracted text. Possible values are:
+  - `"english"`
+  - `"arabic"`
+  - `"other"`
 
 **Error Responses:**
 - 400: Invalid file type, missing file or URL, or file size exceeds 5MB
