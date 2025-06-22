@@ -24,7 +24,7 @@ class ModelConfig:
 
         cls._tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
         cls._model = AutoModel.from_pretrained(model_dir, trust_remote_code=True)
-
+        print(f"Model loaded from {model_dir}")
         return cls._model, cls._tokenizer
     
     @classmethod
