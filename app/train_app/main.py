@@ -56,7 +56,7 @@ async def read_root():
     """
     return {"message": "Welcome to the Jina AI Classification API!"}
 
-@app.post("/train", response_model=TrainingResponse)
+@app.post("/train", response_model=TrainingResponse, tags=["Training"])
 async def start_training(request: TrainingRequest, background_tasks: BackgroundTasks):
     """
     Start training a model as a background task.
