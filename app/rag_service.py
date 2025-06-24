@@ -121,7 +121,8 @@ class RAGService:
         try:
             # Retrieve relevant documents
             retrieved_docs = self.vector_store.similarity_search(question, k=k)
-
+            retrieved_docs_for_llm = retrieved_docs[:10]
+            
             # Extract file_ids from metadata
             top_file_ids: List[Optional[int]] = []
             for doc in retrieved_docs:
@@ -131,7 +132,7 @@ class RAGService:
                     top_file_ids.append(None)
 
             # Prepare context for the LLM
-            docs_content = "\n\n".join([doc.page_content for doc in retrieved_docs])
+            docs_content = "\n\n".join([doc.page_content for doc in retrieved_docs_for_llm])
 
             # Invoke the prompt and LLM
             message_payload = self.prompt.invoke({
