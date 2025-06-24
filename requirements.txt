@@ -23,5 +23,6 @@ langchain-openai
 langchain-chroma
 langchain-core
 chromadb
+chromadb-client
 transformers
 einops

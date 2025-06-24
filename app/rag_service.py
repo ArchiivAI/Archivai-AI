@@ -7,8 +7,7 @@ from langchain import hub
 from langchain_openai import AzureChatOpenAI
 from typing import List, Tuple, Optional, Any
 import cohere
-
-
+from chromadb import HttpClient
 class CohereEmbeddings(Embeddings):
     def __init__(self, keys_client: SecretClient):
         """Initialize Cohere embeddings with Azure Key Vault credentials."""
@@ -32,6 +31,9 @@ class CohereEmbeddings(Embeddings):
 
 class RAGService:
     def __init__(self, keys_client: SecretClient):
+        import posthog
+        posthog.disabled = True
+
         """Initialize RAG service with Azure credentials."""
         # Initialize Azure credentials
         self.keys_client = keys_client
@@ -52,12 +54,17 @@ class RAGService:
 
         # Initialize embeddings
         self.cohere_embeddings = CohereEmbeddings(keys_client)
-        
+
+        # Initialize Chroma client
+        client = HttpClient(
+            host=keys_client.get_secret("CHROMA-API-HOST").value,
+            port="8000",
+        )
         # Initialize vector store
         self.vector_store = Chroma(
+            client=client,
             collection_name="archivai_collection",
             embedding_function=self.cohere_embeddings,
-            persist_directory="./app/rag/chroma_langchain_db"
         )
         
         # Load RAG prompt
