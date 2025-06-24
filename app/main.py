@@ -311,7 +311,10 @@ async def store_document_endpoint(request: StoreDataRequest):
     """
     try:
         result = rag_service.store_data(request.document_text, request.file_id)
-        return JSONResponse(content=result)
+        if result["status"] == "error":
+            raise HTTPException(status_code=400, detail=result["message"])
+        else:
+            return JSONResponse(content=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while storing the document: {str(e)}")
 
@@ -351,7 +354,10 @@ async def clear_documents_endpoint(request: ClearDataRequest):
     """
     try:
         result = rag_service.clear_data(request.file_id)
-        return JSONResponse(content=result)
+        if result["status"] == "error":
+            raise HTTPException(status_code=400, detail=result["message"])
+        else:
+            return JSONResponse(content=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred while clearing documents: {str(e)}")
 

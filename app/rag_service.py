@@ -82,6 +82,14 @@ class RAGService:
             dict: Status message
         """
         try:
+            # Check if file_id already exists
+            existing_docs = self.vector_store._collection.get(where={"file_id": file_id}, include=[])
+            if existing_docs["ids"]:
+                return {
+                    "status": "error",
+                    "message": f"Document with file_id {file_id} already exists in the vector store.",
+                    "file_id": file_id
+                }
             doc = Document(page_content=document_text, metadata={"file_id": file_id})
             self.vector_store.add_documents([doc])
             return {
