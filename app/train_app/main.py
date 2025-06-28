@@ -30,6 +30,7 @@ app.add_middleware(
 
 # Pydantic models for training requests
 class TrainingRequest(BaseModel):
+    user_id: Optional[int] = Field(None, description="User ID for tracking purposes")
     folder_ids: Optional[List[int]] = Field(None, description="List of folder IDs to fetch data from")
     output_dir: Optional[str] = Field("output/jina_classification", description="Output directory for model checkpoints")
     run_name: Optional[str] = Field("jina_classification_training", description="MLflow run name")
@@ -80,7 +81,8 @@ async def start_training(request: TrainingRequest, background_tasks: BackgroundT
             train_model,
             folder_ids=request.folder_ids,
             output_dir=request.output_dir,
-            run_name=request.run_name
+            run_name=request.run_name,
+            user_id=request.user_id
         )
         
         logger.info("Training started as a background task")

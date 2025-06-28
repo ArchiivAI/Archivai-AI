@@ -123,7 +123,7 @@ def get_training_status():
     """
     return training_status
 
-def train_model(folder_ids: list = None, output_dir: str = "output/jina_classification", run_name: str = "jina_classification_training"):
+def train_model(folder_ids: list = None, output_dir: str = "output/jina_classification", run_name: str = "jina_classification_training", user_id: int = None):
     global training_status
 
     try:
