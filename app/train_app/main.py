@@ -104,7 +104,6 @@ async def get_status():
     return {"status": status}
 
 @app.post("/edit-config", tags=["Config"])
-
 async def edit_config(request: ConfigEditRequest):
     """
     Endpoint to edit the model configuration parameters.
@@ -145,3 +144,9 @@ async def edit_config(request: ConfigEditRequest):
         logger.error(f"Failed to update configuration: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
 
+@app.get("/heartbeat", tags=["Health"])
+async def heartbeat():
+    """
+    Health check endpoint to ensure the service is running.
+    """
+    return {"status": "healthy"}

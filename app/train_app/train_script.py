@@ -12,8 +12,6 @@ from transformers import (
     TrainingArguments,
     Trainer,
     TrainerCallback,
-    TrainerControl,
-    TrainerState
 )
 from transformers.integrations import MLflowCallback
 from train_app.train_classes import (
@@ -66,6 +64,30 @@ class CustomMLflowCallback(MLflowCallback):
             if self._auto_end_run and self._ml_flow.active_run():
                 self._ml_flow.end_run()
 
+class HeartbeatCallback(TrainerCallback):
+    """Callback to send heartbeat signals during training."""
+    
+    def on_train_begin(self, args, state, control, **kwargs):
+        self._send_heartbeat("Training started")
+    
+    def on_train_end(self, args, state, control, **kwargs):
+        self._send_heartbeat("Training ended")
+    
+    def on_step_end(self, args, state, control, **kwargs):
+        self._send_heartbeat(f"Step {state.global_step} completed")
+
+    def _send_heartbeat(self, message):
+        base_url = keys_client.get_secret("archivai-ai-base-endpoint").value
+        endpoint = "heartbeat"
+        url = f"{base_url}/{endpoint}"
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                print(f"Heartbeat sent successfully: {message}")
+            else:
+                print(f"Failed to send heartbeat: {response.status_code}, {response.text}")
+        except Exception as e:
+            print(f"Error sending heartbeat: {e}")
 
 def compute_metrics(eval_pred):
     """Compute evaluation metrics."""
@@ -197,7 +219,7 @@ def train_model(folder_ids: list = None, output_dir: str = "output/jina_classifi
             eval_dataset=eval_dataset,
             processing_class=tokenizer,
             compute_metrics=compute_metrics,
-            callbacks=[CustomMLflowCallback()],
+            callbacks=[CustomMLflowCallback(), HeartbeatCallback()],
         )
         
         # 9. Train the model
