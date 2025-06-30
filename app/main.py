@@ -76,24 +76,23 @@ metadata_extractor = MetadataExtractor(
     client=client,
     model=deployment_name,
     system_prompt="""You are a metadata extraction assistant.
+                        Your task is to read the provided document content and extract ONLY the specific fields that will be requested.
 
-Your task is to read the provided document content and extract ONLY the specific fields that will be requested.
+                        Instructions:
+                        - Extract ONLY the fields listed.
+                        - Return your entire response STRICTLY as a JSON object.
+                        - Do NOT include any explanations, comments, or any text before or after the JSON.
+                        - If a field is missing, leave it with null value.
+                        - Always return all requested fields even if you have to set some fields as null.
 
-Instructions:
-- Extract ONLY the fields listed.
-- Return your entire response STRICTLY as a JSON object.
-- Do NOT include any explanations, comments, or any text before or after the JSON.
-- If a field is missing, leave it with null value.
-- Always return all requested fields even if you have to set some fields as null.
+                        Format Example:
+                        {
+                        "field1": "value1",
+                        "field2": "value2",
+                        ...
+                        }
 
-Format Example:
-{
-  "field1": "value1",
-  "field2": "value2",
-  ...
-}
-
-"""
+                        """
 )
 
 # RAG Service Setup
