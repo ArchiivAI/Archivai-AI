@@ -3,6 +3,10 @@
 ## Project Overview
 ArchivAI is a sophisticated AI-powered project designed to process, analyze, and extract metadata from various document types. The project integrates multiple modules for Optical Character Recognition (OCR), metadata extraction, inference, and training, leveraging Azure services for deployment and scalability.
 
+### Demo Videos
+- [Arabic](https://youtu.be/DABST6nzeoM?si=9ypqqKCT-1qK0q-2)
+- [English](https://youtu.be/_OyE9tlmNCY?si=tDp9448gsWnNffmu)
+
 ## AI Features
 
 ArchivAI’s AI core features include:
@@ -24,6 +28,12 @@ ArchivAI’s AI core features include:
 ### Auto Metadata Extraction
 - Extract any metadata about your documents like `name` or `email` in your emails folder, for example.
 - Utilizes Azure OpenAI GPT-4 API for intelligent metadata extraction.
+
+## Architecture Diagrams
+### Architexture Diagram
+![Architecture Diagram](Architecture_Diagram_Final.png)  
+### Deployment Architecture
+![Deployment Architecture](Deployment-arch.png)
 
 ---
 
