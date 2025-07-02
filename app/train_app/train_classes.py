@@ -11,11 +11,6 @@ from transformers.modeling_outputs import SequenceClassifierOutput
 from torch.nn import CrossEntropyLoss
 import inspect
 
-# ----------------------------------------------------------------------------------
-# 1. Define a Custom Configuration Class
-# This class will store all the settings for your model. It's the "blueprint"
-# that allows Hugging Face to save and load your model architecture correctly.
-# ----------------------------------------------------------------------------------
 class JinaAIClassificationConfig(PretrainedConfig):
     """
     Configuration class for a JinaAIForSequenceClassification model.
@@ -42,8 +37,6 @@ class JinaAIClassificationConfig(PretrainedConfig):
             **kwargs: Forwards standard arguments like `num_labels`, `id2label`, `label2id`
                       to the parent PretrainedConfig.
         """
-        # Pass standard arguments (like num_labels) to the parent class.
-        # This is the key to letting **kwargs handle them automatically.
         super().__init__(**kwargs)
 
         self.base_model_name_or_path = base_model_name_or_path
@@ -51,19 +44,11 @@ class JinaAIClassificationConfig(PretrainedConfig):
         self.lora_task_name = lora_task_name
         self.classifier_dropout = classifier_dropout
 
-# ----------------------------------------------------------------------------------
-# 2. Define the Custom Model Class
-# This class inherits from PreTrainedModel, which gives it all the Hugging Face
-# superpowers like .from_pretrained() and .save_pretrained().
-# ----------------------------------------------------------------------------------
 class JinaAIForSequenceClassification(PreTrainedModel):
     """
     A custom Jina AI model for sequence classification with a mean pooling head.
     This model is compatible with the Hugging Face Trainer.
     """
-    # FIX for RecursionError: The name of the attribute holding the base model
-    # must NOT conflict with the internal `base_model` property of PreTrainedModel.
-    # We rename our attribute to `jina_model` and set the prefix to match.
     base_model_prefix = "jina_model"
     config_class = JinaAIClassificationConfig  # Link to your custom config class
 
@@ -134,7 +119,7 @@ class JinaAIForSequenceClassification(PreTrainedModel):
         attention_mask=None,
         token_type_ids=None,
         labels=None,
-        **kwargs # Accept extra arguments
+        **kwargs
     ):
         """
         Forward pass for the classification model.
