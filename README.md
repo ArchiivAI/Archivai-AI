@@ -6,23 +6,28 @@ ArchivAI is a sophisticated AI-powered project designed to process, analyze, and
 ## AI Features
 
 ArchivAI’s AI core features include:
-
-
 ### Optical Character Recognition (OCR)
 - An AI-driven OCR module converts scanned, non-digital documents into searchable text.
+- Implemented using Azure OpenAI GPT-4 API for advanced text recognition.
 
 ### Supervised Document Classification
 - The system uses supervised learning with labeled data to identify patterns, allowing it to intelligently categorize new documents without manual intervention.
+- Fine-tuned Jina embedding v3 model using Transformers and PyTorch library.
+- Achieved 92% accuracy on the Tobacco 3482 Dataset.
 
-### Semantic Search
+### Semantic Search & RAG
 - Unlike traditional keyword-based searches, our semantic search understands the context behind queries, providing more accurate and relevant results.
+- Powered by Cohere embeddings deployed on Azure Machine Learning Studio.
+- Utilizes ChromaDB as the vector database for storing and querying document embeddings.
+- Generation model is GPT-4o, implemented using LangChain for seamless integration and advanced response generation.
 
 ### Auto Metadata Extraction
 - Extract any metadata about your documents like `name` or `email` in your emails folder, for example.
+- Utilizes Azure OpenAI GPT-4 API for intelligent metadata extraction.
 
 ---
 
-## Folder Structure
+## Project Structure
 
 ### 1. `app/`
 - **Purpose**: Contains the main application logic for metadata extraction and OCR.
@@ -31,6 +36,7 @@ ArchivAI’s AI core features include:
   - `metadata_extractor.py`: Handles metadata extraction from documents.
   - `ocr_functions.py`: Implements OCR functionalities.
   - `rag_service.py`: Provides retrieval-augmented generation (RAG) services.
+  - `API_Docs.md`: Documents the API endpoints for the main application.
 - **Integration**: This folder integrates with the `rag/chroma_langchain_db/` for database operations and `train_app/` for model training.
 
 ### 2. `app/train_app/`
@@ -42,6 +48,7 @@ ArchivAI’s AI core features include:
   - `model_saving.py`: Handles saving trained models.
   - `train_classes.py`: Defines training classes.
   - `train_script.py`: Executes the training process.
+  - `api-docs.md`: Documents the API endpoints for training workflows.
 - **Integration**: This folder interacts with `app/` for deploying trained models.
 
 
